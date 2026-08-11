@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+  <html lang="en">
+  <head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>History | Kangaroo Cup</title>
+  <meta name="theme-color" content="#1f6b3a">
+  <link rel="manifest" href="manifest.json">
+  <link rel="icon" href="assets/img/favicon-32-v2.png">
+  <link rel="apple-touch-icon" href="assets/img/apple-touch-icon-v2.png">
+  <link rel="stylesheet" href="css/style.css">
+  </head>
+  <body>
+
+  <div id="site-header"></div>
+
+  <main class="wrap" style="padding-top:40px;">
+
+  <section class="trophy-hero">
+  <div class="trophy-hero-inner">
+  <img class="trophy-hero-photo" src="assets/gallery/trophy-closeup.jpg" alt="The Kangaroo Cup trophy, engraved with past champions">
+  <div>
+  <h2 style="margin-top:0;">The trophy</h2>
+  <p style="margin:0;">
+  The trophy is a precious, custom designed kangaroo statuette,
+  engraved with the names of all winners and glued back together
+multiple times. He/she/they is handed on to the new champion
+each year. So far the plate reads Jan Eege Klop (2022) and Olaf
+Kwakman (2023), with more rows waiting to be filled in.
+  </p>
+  </div>
+  </div>
+  </section>
+
+  <section>
+  <h2>Champions through the years</h2>
+  <p style="color:var(--muted); margin-top:-10px;">
+  Pulled from the same <code>js/data.js</code> file as the Rankings
+page. Fill in a "champion" for each year and it shows up here.
+  </p>
+  <div class="history-grid" id="history-grid"></div>
+  </section>
+
+  <section>
+  <h2>The green jackets</h2>
+<div class="photo-grid">
+<img src="assets/gallery/green-jacket-1.jpg" alt="Kangaroo Cup green jacket tradition">
+  <img src="assets/gallery/green-jacket-handover.jpg" alt="Handing over the green jacket">
+  <img src="assets/gallery/green-jacket-2.jpg" alt="Three champions in green jackets">
+  </div>
+  </section>
+
+  <section>
+  <h2>Notes</h2>
+  <div class="card">
+  <p style="margin:0;">Traditionally based out of a share house in Perth's northern suburbs, 1 Bantry Court, Kallaroo.</p>
+  </div>
+  </section>
+  </main>
+
+  <div id="site-footer"></div>
+
+  <script src="js/data.js"></script>
+  <script src="js/app.js"></script>
+  <script>
+  function renderHistoryGrid() {
+const grid = document.getElementById("history-grid");
+grid.innerHTML = KANGAROO_CUP.editions
+  .slice()
+  .sort((a, b) => b.year - a.year)
+  .map(
+  (ed) => `
+  <div class="history-card">
+  <div class="year">${ed.year}</div>
+  <div class="champ">${ed.champion || "Champion TBD"}</div>
+  </div>`
+  )
+  .join("");
+}
+document.addEventListener("DOMContentLoaded", renderHistoryGrid);
+</script>
+  </body>
+  </html>
+  
