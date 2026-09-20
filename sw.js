@@ -1,49 +1,54 @@
-const CACHE_NAME = "kangaroo-cup-v2";
+/* Minimal service worker: caches the app shell so it opens instantly
+   and works offline once visited. Bump CACHE_NAME whenever you change
+   the site so visitors get the fresh version. */
+
+const CACHE_NAME = "kangaroo-cup-v3";
 const APP_SHELL = [
-"index.html",
-"program.html",
-"results.html",
-"history.html",
-"css/style.css",
-"js/app.js",
-"js/data.js",
-"manifest.json",
-"assets/img/crest-hero.png",
-"assets/img/crest-nav.png",
-"assets/img/icon-192-v2.png",
-"assets/img/icon-512-v2.png"
+  "index.html",
+  "program.html",
+  "format.html",
+  "results.html",
+  "history.html",
+  "css/style.css",
+  "js/app.js",
+  "js/data.js",
+  "manifest.json",
+  "assets/img/crest-hero.png",
+  "assets/img/crest-nav.png",
+  "assets/img/icon-192-v2.png",
+  "assets/img/icon-512-v2.png"
 ];
 
 self.addEventListener("install", (event) => {
-event.waitUntil(
-caches.open(CACHE_NAME).then((cache) => cache.addAll(APP_SHELL))
-);
-self.skipWaiting();
+  event.waitUntil(
+    caches.open(CACHE_NAME).then((cache) => cache.addAll(APP_SHELL))
+  );
+  self.skipWaiting();
 });
 
 self.addEventListener("activate", (event) => {
-event.waitUntil(
-caches.keys().then((keys) =>
-Promise.all(
-keys.filter((k) => k !== CACHE_NAME).map((k) => caches.delete(k))
-)
-)
-);
-self.clients.claim();
+  event.waitUntil(
+    caches.keys().then((keys) =>
+      Promise.all(
+        keys.filter((k) => k !== CACHE_NAME).map((k) => caches.delete(k))
+      )
+    )
+  );
+  self.clients.claim();
 });
 
 self.addEventListener("fetch", (event) => {
-if (event.request.method !== "GET") return;
-event.respondWith(
-caches.match(event.request).then((cached) => {
-const network = fetch(event.request)
-.then((response) => {
-const copy = response.clone();
-caches.open(CACHE_NAME).then((cache) => cache.put(event.request, copy));
-return response;
-})
-.catch(() => cached);
-return cached || network;
-})
-);
+  if (event.request.method !== "GET") return;
+  event.respondWith(
+    caches.match(event.request).then((cached) => {
+      const network = fetch(event.request)
+        .then((response) => {
+          const copy = response.clone();
+          caches.open(CACHE_NAME).then((cache) => cache.put(event.request, copy));
+          return response;
+        })
+        .catch(() => cached);
+      return cached || network;
+    })
+  );
 });
