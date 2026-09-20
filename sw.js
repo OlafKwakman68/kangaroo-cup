@@ -2,7 +2,7 @@
    and works offline once visited. Bump CACHE_NAME whenever you change
    the site so visitors get the fresh version. */
 
-const CACHE_NAME = "kangaroo-cup-v4";
+const CACHE_NAME = "kangaroo-cup-v5";
 const APP_SHELL = [
   "index.html",
   "program.html",
@@ -39,6 +39,28 @@ self.addEventListener("activate", (event) => {
 
 self.addEventListener("fetch", (event) => {
   if (event.request.method !== "GET") return;
+
+  /* HTML pages: always try the network first so edits show up on the very
+     next load, no cache-version bump needed. Falls back to the cached copy
+     only when offline. */
+  const isHTML =
+    event.request.mode === "navigate" ||
+    (event.request.headers.get("accept") || "").includes("text/html");
+
+  if (isHTML) {
+    event.respondWith(
+      fetch(event.request)
+        .then((response) => {
+          const copy = response.clone();
+          caches.open(CACHE_NAME).then((cache) => cache.put(event.request, copy));
+          return response;
+        })
+        .catch(() => caches.match(event.request))
+    );
+    return;
+  }
+
+  /* CSS/JS/images: cache-first for speed, refreshed in the background. */
   event.respondWith(
     caches.match(event.request).then((cached) => {
       const network = fetch(event.request)
