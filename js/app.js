@@ -73,7 +73,40 @@ document.addEventListener("click", (e) => {
       if (banner) banner.classList.remove("show");
     });
   }
+  if (e.target && e.target.id === "install-dismiss-btn") {
+    const banner = document.getElementById("install-banner");
+    if (banner) banner.classList.remove("show");
+    try { localStorage.setItem("kc-install-dismissed", "1"); } catch (err) {}
+  }
 });
+
+/* iOS Safari has no beforeinstallprompt event, so show manual instructions
+   instead. Runs after renderHeader() has put the banner in the DOM. */
+function isIosDevice() {
+  return /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
+}
+
+function isStandalone() {
+  return (
+    window.matchMedia("(display-mode: standalone)").matches ||
+    window.navigator.standalone === true
+  );
+}
+
+function showIosInstallBanner() {
+  let dismissed = false;
+  try { dismissed = localStorage.getItem("kc-install-dismissed") === "1"; } catch (err) {}
+  if (dismissed || isStandalone()) return;
+
+  const banner = document.getElementById("install-banner");
+  if (!banner) return;
+  banner.innerHTML = `
+    Add Kangaroo Cup to your home screen: tap
+    <strong>Share&nbsp;&#8679;</strong> then "Add to Home Screen"
+    <button id="install-dismiss-btn" aria-label="Dismiss">&times;</button>
+  `;
+  banner.classList.add("show");
+}
 
 /* Service worker registration (safe no-op if unsupported / off-origin) */
 if ("serviceWorker" in navigator) {
@@ -85,4 +118,5 @@ if ("serviceWorker" in navigator) {
 document.addEventListener("DOMContentLoaded", () => {
   renderHeader();
   renderFooter();
+  if (isIosDevice()) showIosInstallBanner();
 });
