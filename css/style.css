@@ -690,3 +690,16 @@ cursor: pointer;
 @media (max-width: 680px) {
   .format-step { flex-direction: column; }
 }
+
+/* Venue badge (program page day-cards) */
+.venue-badge {
+  display: inline-block;
+  background: var(--gold);
+  color: var(--green-dark);
+  font-size: .85rem;
+  font-weight: 800;
+  letter-spacing: .2px;
+  padding: 5px 14px;
+  border-radius: 14px;
+  margin: 2px 0 14px;
+}
