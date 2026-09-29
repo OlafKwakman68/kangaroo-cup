@@ -32,6 +32,11 @@
     width:100%; padding:10px 11px; border-radius:8px; border:1px solid #ddd3b6;
     font-size:1.05rem; font-family:inherit; background:var(--cream); color:var(--text); text-align:center;
   }
+  .lc-hole-info {
+    width:100%; padding:10px 11px; border-radius:8px; border:1px solid #ddd3b6;
+    font-size:1rem; font-family:inherit; background:#fff; color:var(--green-dark);
+    text-align:center; font-weight:700; box-sizing:border-box;
+  }
 
   .lc-btn-row { display:flex; gap:10px; margin-top:16px; flex-wrap:wrap; }
   .lc-btn-secondary {
@@ -69,7 +74,7 @@
 
   <section class="format-hero">
     <h2 style="border:none; padding-bottom:0;">Live Scorer</h2>
-    <p class="subtitle">Hole-by-hole match play calculator for Sunday</p>
+    <p class="subtitle">Hole-by-hole match play calculator for Sunday's final at Kennedy Bay Links</p>
   </section>
 
   <section style="margin-bottom:22px;">
@@ -81,15 +86,15 @@
     <div class="card" style="margin-bottom:18px;">
       <h3 style="margin-top:0;">Players &amp; handicaps</h3>
       <div class="lc-setup-grid" id="setup-grid"></div>
-      <p class="lc-note">Set this up once before the round starts. Handicap is each player's playing handicap for the day &mdash; used to work out who gets a stroke on each hole.</p>
+      <p class="lc-note">Set this up once before the round starts. Handicap is each player's playing handicap for the day &mdash; used to work out who gets a stroke on each hole. Par and stroke index are preloaded from the Kennedy Bay Links scorecard.</p>
     </div>
 
     <div class="card" style="margin-bottom:18px;">
       <h3 style="margin-top:0;" id="hole-heading">Hole 1</h3>
       <div class="lc-hole-row">
         <div class="lc-hole-field">
-          <label>Stroke index</label>
-          <input type="number" id="input-si" min="1" max="18" inputmode="numeric">
+          <label>Par / SI</label>
+          <div class="lc-hole-info" id="hole-info">&mdash;</div>
         </div>
         <div class="lc-hole-field" id="score-field-0">
           <label></label>
@@ -135,6 +140,17 @@
 <script src="js/app.js"></script>
 <script>
 (function () {
+  // Kennedy Bay Links, White tees. Par and stroke index per hole (1-18),
+  // cross-checked against the club's scorecard and an independent
+  // published yardage/handicap listing for this course.
+  const KENNEDY_BAY_HOLES = [
+    { par: 4, si: 5 },  { par: 4, si: 9 },  { par: 3, si: 17 }, { par: 5, si: 15 },
+    { par: 4, si: 3 },  { par: 4, si: 7 },  { par: 4, si: 13 }, { par: 3, si: 11 },
+    { par: 5, si: 1 },  { par: 4, si: 6 },  { par: 4, si: 10 }, { par: 3, si: 18 },
+    { par: 5, si: 16 }, { par: 4, si: 4 },  { par: 5, si: 8 },  { par: 4, si: 14 },
+    { par: 3, si: 12 }, { par: 4, si: 2 }
+  ];
+
   const FLIGHTS = {
     winners: { key: "kc-live-winners-v1", label: "Winners Flight" },
     minor: { key: "kc-live-minor-v1", label: "Minor Flight" }
@@ -274,10 +290,17 @@
   }
 
   function renderHoleInputs() {
-    const holeNum = state.holes.length + 1;
+    const holeIdx = state.holes.length;
+    const holeNum = holeIdx + 1;
     document.getElementById("hole-heading").textContent =
       holeNum <= 18 ? "Hole " + holeNum : "Round complete";
-    document.getElementById("input-si").value = "";
+    const info = document.getElementById("hole-info");
+    if (holeNum <= 18) {
+      const h = KENNEDY_BAY_HOLES[holeIdx];
+      info.textContent = "Par " + h.par + " / SI " + h.si;
+    } else {
+      info.textContent = "—";
+    }
     for (let i = 0; i < 3; i++) {
       document.getElementById("input-score-" + i).value = "";
     }
@@ -374,10 +397,9 @@
 
   document.getElementById("btn-add-hole").addEventListener("click", () => {
     if (state.holes.length >= 18) return;
-    const si = Number(document.getElementById("input-si").value);
+    const si = KENNEDY_BAY_HOLES[state.holes.length].si;
     const scores = [0, 1, 2].map((i) => document.getElementById("input-score-" + i).value);
 
-    if (!si || si < 1 || si > 18) { alert("Enter a stroke index between 1 and 18."); return; }
     if (scores.some((s) => s === "" || Number(s) <= 0)) { alert("Enter a score for all three players."); return; }
 
     state.holes.push({ si: si, scores: scores.map(Number) });
