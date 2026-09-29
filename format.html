@@ -55,12 +55,18 @@
 
         <div class="format-why" style="margin-top:16px;">
           <span class="icon">&#9878;&#65039;</span>
-          <p style="margin:0;">
-            <strong>Handicap correction:</strong> if a player scores more than 36 Stableford
-            points in a qualifying round, their handicap is adjusted for the next day.
-            Each morning, a player starts from whichever is lower: their existing handicap,
-            or the handicap implied by their round the day before.
-          </p>
+          <div style="flex:1;">
+            <p style="margin:0 0 8px;">
+              <strong>Handicap correction:</strong> this only kicks in when a player scores
+              <strong>more than 36 Stableford points</strong> in a qualifying round. Score 36 or
+              fewer and nothing changes &mdash; your handicap carries over as-is. Score more than 36
+              and your handicap for the next day drops by the number of points above 36.
+            </p>
+            <ul style="margin:0; padding-left:18px; line-height:1.6;">
+              <li>Plays off 25.0, scores 38 points (2 over 36) &rarr; next day starts off <strong>23.0</strong></li>
+              <li>Plays off 32.4, scores 29 points (under 36) &rarr; next day stays at <strong>32.4</strong></li>
+            </ul>
+          </div>
         </div>
       </div>
     </div>
