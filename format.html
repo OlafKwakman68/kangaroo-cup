@@ -26,7 +26,7 @@
       <div class="format-num">1</div>
       <div style="flex:1;">
         <h3>Friday &amp; Saturday: Qualifying</h3>
-        <p>Stableford with handicap correction. Top 4 total scores across both rounds qualify for Sunday.</p>
+        <p>Stableford with handicap correction. Total scores across both rounds decide who plays in which Sunday flight.</p>
         <div class="format-players">
           <span class="format-player-chip">Player A</span>
           <span class="format-player-chip">Player B</span>
@@ -35,14 +35,32 @@
           <span class="format-player-chip">Player E</span>
           <span class="format-player-chip">Player F</span>
           <span class="format-player-chip">Player G</span>
-          <span class="format-player-chip">Player H</span>
         </div>
-        <p style="margin-top:14px;"><strong>4 Finalists&nbsp;&rarr;</strong></p>
+
+        <p style="margin-top:14px;"><strong>1st&ndash;3rd&nbsp;&rarr;</strong></p>
         <div class="format-players">
           <span class="format-player-chip finalist">Player A</span>
           <span class="format-player-chip finalist">Player B</span>
           <span class="format-player-chip finalist">Player C</span>
-          <span class="format-player-chip finalist">Player D</span>
+        </div>
+
+        <p style="margin-top:14px;"><strong>4th&ndash;6th&nbsp;&rarr;</strong></p>
+        <div class="format-players">
+          <span class="format-player-chip minor">Player D</span>
+          <span class="format-player-chip minor">Player E</span>
+          <span class="format-player-chip minor">Player F</span>
+        </div>
+
+        <p style="margin-top:14px;">The 7th-placed qualifier finishes 7th outright &mdash; no playoff needed for a field of one.</p>
+
+        <div class="format-why" style="margin-top:16px;">
+          <span class="icon">&#9878;&#65039;</span>
+          <p style="margin:0;">
+            <strong>Handicap correction:</strong> if a player scores more than 36 Stableford
+            points in a qualifying round, their handicap is adjusted for the next day.
+            Each morning, a player starts from whichever is lower: their existing handicap,
+            or the handicap implied by their round the day before.
+          </p>
         </div>
       </div>
     </div>
@@ -50,15 +68,12 @@
     <div class="format-step">
       <div class="format-num">2</div>
       <div style="flex:1;">
-        <h3>Sunday Winners Flight</h3>
-        <p>Four-ball match play. Each finalist plays a separate match against each of the other three, all at once, for 3 matches per player.</p>
+        <h3>Sunday: Winners Flight (1st&ndash;3rd)</h3>
+        <p>Three-ball match play. Each finalist plays a separate match against each of the other two, all at once.</p>
         <div class="format-matches">
           <div class="format-match">Player A <span class="vs">VS</span> Player B</div>
           <div class="format-match">Player A <span class="vs">VS</span> Player C</div>
-          <div class="format-match">Player A <span class="vs">VS</span> Player D</div>
           <div class="format-match">Player B <span class="vs">VS</span> Player C</div>
-          <div class="format-match">Player B <span class="vs">VS</span> Player D</div>
-          <div class="format-match">Player C <span class="vs">VS</span> Player D</div>
         </div>
       </div>
     </div>
@@ -66,19 +81,32 @@
     <div class="format-step">
       <div class="format-num">3</div>
       <div style="flex:1;">
-        <h3>Scoring</h3>
-        <p style="margin:0 0 10px;">Each finalist plays 3 individual matches, one against each of the other three.</p>
-        <table class="scoring-table">
-          <tr><td>Win</td><td>2 points</td></tr>
-          <tr><td>Halved match</td><td>1 point</td></tr>
-          <tr><td>Loss</td><td>0 points</td></tr>
-        </table>
-        <p style="margin-top:10px;">Points across all 3 matches are added up; highest total after 18 holes wins the Kangaroo Cup.</p>
+        <h3>Sunday: Minor Flight (4th&ndash;6th)</h3>
+        <p>Same format, one group down. Three-ball match play among the next-best qualifiers decides 4th, 5th and 6th place.</p>
+        <div class="format-matches">
+          <div class="format-match">Player D <span class="vs">VS</span> Player E</div>
+          <div class="format-match">Player D <span class="vs">VS</span> Player F</div>
+          <div class="format-match">Player E <span class="vs">VS</span> Player F</div>
+        </div>
       </div>
     </div>
 
     <div class="format-step">
       <div class="format-num">4</div>
+      <div style="flex:1;">
+        <h3>Scoring</h3>
+        <p style="margin:0 0 10px;">In each flight, every player plays 2 individual matches, one against each of the other two.</p>
+        <table class="scoring-table">
+          <tr><td>Win</td><td>2 points</td></tr>
+          <tr><td>Halved match</td><td>1 point</td></tr>
+          <tr><td>Loss</td><td>0 points</td></tr>
+        </table>
+        <p style="margin-top:10px;">Points across both matches are added up; highest total after 18 holes wins the flight. In the Winners Flight, that's the Kangaroo Cup.</p>
+      </div>
+    </div>
+
+    <div class="format-step">
+      <div class="format-num">5</div>
       <div style="flex:1;">
         <h3>Tiebreak</h3>
         <ul class="tiebreak-list">
@@ -92,8 +120,17 @@
       <span class="icon">&#128161;</span>
       <p style="margin:0;">
         <strong>Why this works:</strong> no player is forced to beat the best score of
-        all three opponents on every hole. Each match is decided on its own, so it stays
-        a fair, simple final format for mixed handicaps even with a bigger field.
+        both opponents on every hole. Each match is decided on its own, so it stays
+        a fair, simple final format for mixed handicaps &mdash; and running two flights
+        means every player still has something real to play for on Sunday.
+      </p>
+    </div>
+
+    <div class="format-why" style="margin-top:16px;">
+      <span class="icon">&#128202;</span>
+      <p style="margin:0;">
+        Use the <a href="calculator.html" style="color:var(--green-dark); font-weight:700;">Live Scorer</a>
+        during the Sunday flights to enter each hole as it's played and see match points update instantly.
       </p>
     </div>
   </section>
