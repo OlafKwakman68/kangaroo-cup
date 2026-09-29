@@ -1,0 +1,412 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Live Scorer | Kangaroo Cup</title>
+<meta name="theme-color" content="#1f6b3a">
+<link rel="manifest" href="manifest.json">
+<link rel="icon" href="assets/img/favicon-32-v2.png">
+<link rel="apple-touch-icon" href="assets/img/apple-touch-icon-v2.png">
+<link rel="stylesheet" href="css/style.css">
+<style>
+  .lc-tabs { display:flex; gap:10px; margin-bottom:20px; }
+  .lc-tab {
+    flex:1; text-align:center; padding:10px 12px; border-radius:30px;
+    font-weight:700; cursor:pointer; border:2px solid var(--green);
+    background:#fff; color:var(--green-dark); font-size:.9rem;
+  }
+  .lc-tab.active { background:var(--green); color:#fff; }
+
+  .lc-setup-grid { display:grid; grid-template-columns: 1fr 90px; gap:10px 12px; align-items:center; }
+  .lc-setup-grid label { font-size:.8rem; color:var(--muted); font-weight:600; }
+  .lc-setup-grid input {
+    width:100%; padding:9px 11px; border-radius:8px; border:1px solid #ddd3b6;
+    font-size:.95rem; font-family:inherit; background:var(--cream); color:var(--text);
+  }
+
+  .lc-hole-row { display:flex; gap:10px; flex-wrap:wrap; margin-top:14px; }
+  .lc-hole-field { flex:1; min-width:90px; }
+  .lc-hole-field label { display:block; font-size:.76rem; color:var(--muted); font-weight:700; margin-bottom:4px; }
+  .lc-hole-field input {
+    width:100%; padding:10px 11px; border-radius:8px; border:1px solid #ddd3b6;
+    font-size:1.05rem; font-family:inherit; background:var(--cream); color:var(--text); text-align:center;
+  }
+
+  .lc-btn-row { display:flex; gap:10px; margin-top:16px; flex-wrap:wrap; }
+  .lc-btn-secondary {
+    background:transparent; color:var(--green-dark); border:2px solid var(--green);
+    padding:10px 20px; border-radius:30px; font-weight:600; font-size:.88rem; cursor:pointer;
+  }
+  .lc-btn-secondary:active { transform: scale(.97); }
+  .lc-btn-danger { border-color:#b23b3b; color:#b23b3b; }
+
+  .lc-standings { width:100%; border-collapse:collapse; margin-top:14px; }
+  .lc-standings th, .lc-standings td {
+    padding:9px 8px; text-align:center; border-bottom:1px solid #eee5cf; font-size:.86rem;
+  }
+  .lc-standings th { color:var(--muted); font-weight:700; font-size:.72rem; text-transform:uppercase; }
+  .lc-standings td.lc-name { text-align:left; font-weight:700; color:var(--green-dark); }
+  .lc-standings tr.lc-leader td.lc-name { color:var(--gold-dark); }
+  .lc-standings td.lc-total { font-weight:800; color:var(--green-dark); }
+  .lc-status { font-size:.72rem; color:var(--muted); display:block; margin-top:1px; }
+
+  .lc-log-wrap { overflow-x:auto; margin-top:10px; }
+  table.lc-log { width:100%; border-collapse:collapse; min-width:520px; }
+  table.lc-log th, table.lc-log td {
+    padding:7px 6px; text-align:center; border-bottom:1px solid #eee5cf; font-size:.8rem;
+  }
+  table.lc-log th { color:var(--muted); font-weight:700; font-size:.68rem; text-transform:uppercase; }
+  .lc-empty { color:var(--muted); font-size:.9rem; font-style:italic; }
+  .lc-note { font-size:.82rem; color:var(--muted); margin-top:10px; }
+</style>
+</head>
+<body>
+
+<div id="site-header"></div>
+
+<main class="wrap" style="padding-top:40px;">
+
+  <section class="format-hero">
+    <h2 style="border:none; padding-bottom:0;">Live Scorer</h2>
+    <p class="subtitle">Hole-by-hole match play calculator for Sunday</p>
+  </section>
+
+  <section style="margin-bottom:22px;">
+    <div class="lc-tabs">
+      <div class="lc-tab" id="tab-winners" data-flight="winners">Winners Flight (1&ndash;3)</div>
+      <div class="lc-tab" id="tab-minor" data-flight="minor">Minor Flight (4&ndash;6)</div>
+    </div>
+
+    <div class="card" style="margin-bottom:18px;">
+      <h3 style="margin-top:0;">Players &amp; handicaps</h3>
+      <div class="lc-setup-grid" id="setup-grid"></div>
+      <p class="lc-note">Set this up once before the round starts. Handicap is each player's playing handicap for the day &mdash; used to work out who gets a stroke on each hole.</p>
+    </div>
+
+    <div class="card" style="margin-bottom:18px;">
+      <h3 style="margin-top:0;" id="hole-heading">Hole 1</h3>
+      <div class="lc-hole-row">
+        <div class="lc-hole-field">
+          <label>Stroke index</label>
+          <input type="number" id="input-si" min="1" max="18" inputmode="numeric">
+        </div>
+        <div class="lc-hole-field" id="score-field-0">
+          <label></label>
+          <input type="number" id="input-score-0" min="1" inputmode="numeric">
+        </div>
+        <div class="lc-hole-field" id="score-field-1">
+          <label></label>
+          <input type="number" id="input-score-1" min="1" inputmode="numeric">
+        </div>
+        <div class="lc-hole-field" id="score-field-2">
+          <label></label>
+          <input type="number" id="input-score-2" min="1" inputmode="numeric">
+        </div>
+      </div>
+      <div class="lc-btn-row">
+        <button class="btn btn-gold" id="btn-add-hole">Add hole</button>
+        <button class="lc-btn-secondary" id="btn-undo">Undo last hole</button>
+        <button class="lc-btn-secondary lc-btn-danger" id="btn-reset">Reset flight</button>
+      </div>
+      <p class="lc-note" id="round-status"></p>
+    </div>
+
+    <div class="card" style="margin-bottom:18px;">
+      <h3 style="margin-top:0;">Standings</h3>
+      <table class="lc-standings" id="standings-table"></table>
+    </div>
+
+    <div class="card">
+      <details>
+        <summary style="cursor:pointer; font-weight:700; color:var(--green-dark);">Hole-by-hole log</summary>
+        <div class="lc-log-wrap">
+          <table class="lc-log" id="log-table"></table>
+        </div>
+      </details>
+    </div>
+  </section>
+
+</main>
+
+<div id="site-footer"></div>
+
+<script src="js/data.js"></script>
+<script src="js/app.js"></script>
+<script>
+(function () {
+  const FLIGHTS = {
+    winners: { key: "kc-live-winners-v1", label: "Winners Flight" },
+    minor: { key: "kc-live-minor-v1", label: "Minor Flight" }
+  };
+  let currentFlight = "winners";
+  let state = null;
+
+  function defaultState() {
+    return {
+      players: [
+        { name: "Player 1", hcp: 0 },
+        { name: "Player 2", hcp: 0 },
+        { name: "Player 3", hcp: 0 }
+      ],
+      holes: [] // { si, scores: [g0, g1, g2] }
+    };
+  }
+
+  function loadState(flight) {
+    try {
+      const raw = localStorage.getItem(FLIGHTS[flight].key);
+      if (raw) return JSON.parse(raw);
+    } catch (err) {}
+    return defaultState();
+  }
+
+  function saveState() {
+    try {
+      localStorage.setItem(FLIGHTS[currentFlight].key, JSON.stringify(state));
+    } catch (err) {}
+  }
+
+  function strokesReceived(hcp, si) {
+    hcp = Number(hcp) || 0;
+    if (hcp <= 0) return 0;
+    const full = Math.floor(hcp / 18);
+    const extra = (si <= (hcp % 18)) ? 1 : 0;
+    return full + extra;
+  }
+
+  // Pair indices: 0-1, 0-2, 1-2
+  const PAIRS = [[0, 1], [0, 2], [1, 2]];
+
+  function computeMatches() {
+    // returns per pair: { holesA, holesB, halved, played, decided, decidedAt }
+    const matches = PAIRS.map(() => ({ holesA: 0, holesB: 0, halved: 0, played: 0, decided: false, decidedMargin: "" }));
+
+    state.holes.forEach((hole) => {
+      const nets = hole.scores.map((g, i) => {
+        if (g === null || g === undefined || g === "") return null;
+        return g - strokesReceived(state.players[i].hcp, hole.si);
+      });
+
+      PAIRS.forEach((pair, pIdx) => {
+        const [a, b] = pair;
+        const m = matches[pIdx];
+        if (nets[a] === null || nets[b] === null) return;
+        if (m.decided) { m.played++; return; }
+        m.played++;
+        if (nets[a] < nets[b]) m.holesA++;
+        else if (nets[b] < nets[a]) m.holesB++;
+        else m.halved++;
+
+        const remaining = 18 - m.played;
+        const diff = Math.abs(m.holesA - m.holesB);
+        if (diff > remaining) {
+          m.decided = true;
+          m.decidedMargin = diff + "&" + remaining;
+        }
+      });
+    });
+
+    return matches;
+  }
+
+  function matchPoints(m) {
+    if (m.holesA > m.holesB) return [2, 0];
+    if (m.holesB > m.holesA) return [0, 2];
+    if (m.played === 0) return [null, null];
+    return [1, 1];
+  }
+
+  function matchStatusText(m, perspective) {
+    // perspective: "A" or "B" - whose point of view the text is written from
+    if (m.played === 0) return "Not started";
+    const diff = perspective === "A" ? (m.holesA - m.holesB) : (m.holesB - m.holesA);
+    if (m.decided) {
+      return diff > 0 ? "Won " + m.decidedMargin : "Lost " + m.decidedMargin;
+    }
+    if (diff === 0) return "All square";
+    return diff > 0 ? diff + " up" : Math.abs(diff) + " down";
+  }
+
+  function renderSetup() {
+    const grid = document.getElementById("setup-grid");
+    grid.innerHTML = "";
+    state.players.forEach((p, i) => {
+      const nameLabel = document.createElement("label");
+      nameLabel.textContent = "Player " + (i + 1) + " name";
+      const nameInput = document.createElement("input");
+      nameInput.type = "text";
+      nameInput.value = p.name;
+      nameInput.addEventListener("input", (e) => {
+        state.players[i].name = e.target.value || ("Player " + (i + 1));
+        saveState();
+        renderScoreLabels();
+        renderStandings();
+        renderLog();
+      });
+
+      const hcpLabel = document.createElement("label");
+      hcpLabel.textContent = "HCP";
+      const hcpInput = document.createElement("input");
+      hcpInput.type = "number";
+      hcpInput.min = "0";
+      hcpInput.value = p.hcp;
+      hcpInput.addEventListener("input", (e) => {
+        state.players[i].hcp = Number(e.target.value) || 0;
+        saveState();
+        renderStandings();
+        renderLog();
+      });
+
+      grid.appendChild(nameLabel);
+      grid.appendChild(nameInput);
+      grid.appendChild(hcpLabel);
+      grid.appendChild(hcpInput);
+    });
+  }
+
+  function renderScoreLabels() {
+    state.players.forEach((p, i) => {
+      const field = document.getElementById("score-field-" + i);
+      const label = field.querySelector("label");
+      label.textContent = p.name;
+    });
+  }
+
+  function renderHoleInputs() {
+    const holeNum = state.holes.length + 1;
+    document.getElementById("hole-heading").textContent =
+      holeNum <= 18 ? "Hole " + holeNum : "Round complete";
+    document.getElementById("input-si").value = "";
+    for (let i = 0; i < 3; i++) {
+      document.getElementById("input-score-" + i).value = "";
+    }
+    const addBtn = document.getElementById("btn-add-hole");
+    const status = document.getElementById("round-status");
+    if (holeNum > 18) {
+      addBtn.disabled = true;
+      addBtn.style.opacity = ".5";
+      status.textContent = "All 18 holes recorded.";
+    } else {
+      addBtn.disabled = false;
+      addBtn.style.opacity = "1";
+      status.textContent = "";
+    }
+  }
+
+  function renderStandings() {
+    const matches = computeMatches();
+    const totals = [0, 0, 0];
+    const perPlayerMatches = [[], [], []]; // text per opponent
+
+    PAIRS.forEach((pair, idx) => {
+      const [a, b] = pair;
+      const m = matches[idx];
+      const [ptsA, ptsB] = matchPoints(m);
+      if (ptsA !== null) { totals[a] += ptsA; totals[b] += ptsB; }
+      perPlayerMatches[a].push({ opp: b, text: "vs " + state.players[b].name, status: matchStatusText(m, "A"), pts: ptsA });
+      perPlayerMatches[b].push({ opp: a, text: "vs " + state.players[a].name, status: matchStatusText(m, "B"), pts: ptsB });
+    });
+
+    const order = [0, 1, 2].sort((x, y) => totals[y] - totals[x]);
+    const maxTotal = Math.max(...totals);
+
+    const table = document.getElementById("standings-table");
+    let html = "<tr><th>Player</th><th>Match 1</th><th>Match 2</th><th>Total</th></tr>";
+    order.forEach((i) => {
+      const isLeader = totals[i] === maxTotal && maxTotal > 0;
+      html += "<tr class=\"" + (isLeader ? "lc-leader" : "") + "\">";
+      html += "<td class=\"lc-name\">" + escapeHtml(state.players[i].name) + "</td>";
+      perPlayerMatches[i].forEach((pm) => {
+        html += "<td>" + escapeHtml(pm.text) + "<span class=\"lc-status\">" + escapeHtml(pm.status) + "</span></td>";
+      });
+      html += "<td class=\"lc-total\">" + totals[i] + "</td>";
+      html += "</tr>";
+    });
+    table.innerHTML = html;
+  }
+
+  function renderLog() {
+    const table = document.getElementById("log-table");
+    if (state.holes.length === 0) {
+      table.innerHTML = "<tr><td class=\"lc-empty\">No holes recorded yet.</td></tr>";
+      return;
+    }
+    let html = "<tr><th>Hole</th><th>SI</th>";
+    state.players.forEach((p) => { html += "<th>" + escapeHtml(p.name) + "</th>"; });
+    html += "</tr>";
+    state.holes.forEach((hole, idx) => {
+      html += "<tr><td>" + (idx + 1) + "</td><td>" + hole.si + "</td>";
+      hole.scores.forEach((g, i) => {
+        const net = g - strokesReceived(state.players[i].hcp, hole.si);
+        html += "<td>" + g + " (" + net + ")</td>";
+      });
+      html += "</tr>";
+    });
+    table.innerHTML = html;
+  }
+
+  function escapeHtml(str) {
+    return String(str).replace(/[&<>"']/g, (c) => ({
+      "&": "&amp;", "<": "&lt;", ">": "&gt;", "\"": "&quot;", "'": "&#39;"
+    }[c]));
+  }
+
+  function renderAll() {
+    renderSetup();
+    renderScoreLabels();
+    renderHoleInputs();
+    renderStandings();
+    renderLog();
+  }
+
+  function switchFlight(flight) {
+    currentFlight = flight;
+    state = loadState(flight);
+    document.querySelectorAll(".lc-tab").forEach((t) => {
+      t.classList.toggle("active", t.dataset.flight === flight);
+    });
+    renderAll();
+  }
+
+  document.getElementById("tab-winners").addEventListener("click", () => switchFlight("winners"));
+  document.getElementById("tab-minor").addEventListener("click", () => switchFlight("minor"));
+
+  document.getElementById("btn-add-hole").addEventListener("click", () => {
+    if (state.holes.length >= 18) return;
+    const si = Number(document.getElementById("input-si").value);
+    const scores = [0, 1, 2].map((i) => document.getElementById("input-score-" + i).value);
+
+    if (!si || si < 1 || si > 18) { alert("Enter a stroke index between 1 and 18."); return; }
+    if (scores.some((s) => s === "" || Number(s) <= 0)) { alert("Enter a score for all three players."); return; }
+
+    state.holes.push({ si: si, scores: scores.map(Number) });
+    saveState();
+    renderHoleInputs();
+    renderStandings();
+    renderLog();
+  });
+
+  document.getElementById("btn-undo").addEventListener("click", () => {
+    if (state.holes.length === 0) return;
+    state.holes.pop();
+    saveState();
+    renderHoleInputs();
+    renderStandings();
+    renderLog();
+  });
+
+  document.getElementById("btn-reset").addEventListener("click", () => {
+    if (!confirm("Reset all holes and scores for the " + FLIGHTS[currentFlight].label + "? Player names and handicaps are kept.")) return;
+    state.holes = [];
+    saveState();
+    renderHoleInputs();
+    renderStandings();
+    renderLog();
+  });
+
+  switchFlight("winners");
+})();
+</script>
+</body>
+</html>
