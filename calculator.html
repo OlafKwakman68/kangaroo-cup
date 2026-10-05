@@ -81,7 +81,7 @@
   <section style="margin-bottom:22px;">
     <div class="lc-tabs">
       <div class="lc-tab active" id="tab-final" data-flight="final">Final (4 players)</div>
-      <div class="lc-tab" id="tab-losers" data-flight="losers">Losers Flight (3 players)</div>
+      <div class="lc-tab" id="tab-losers" data-flight="losers">Losers Flight (4 players)</div>
     </div>
 
     <div id="panel-final">
@@ -128,9 +128,9 @@
 
     <div id="panel-losers" style="display:none;">
       <div class="card" style="margin-bottom:18px;">
-        <h3 style="margin-top:0;">Players &amp; handicaps</h3>
+        <h3 style="margin-top:0;">Players, handicaps &amp; starting rank</h3>
         <div class="lc-setup-grid" id="setup-grid-losers"></div>
-        <p class="lc-note">Set this up once before the round starts. Handicap is each player's playing handicap for the day &mdash; used to work out who gets a stroke on each hole. Par and stroke index are preloaded from the Kennedy Bay Links scorecard.</p>
+        <p class="lc-note">Rank 1 is the 5th-placed qualifier, rank 4 the 8th (lowest) qualifier in this flight. Rank 1 plays rank 4 and rank 2 plays rank 3 over the front nine; the two front-nine winners play off for 5th place over the back nine, the two front-nine losers play off for 7th place. Par and stroke index are preloaded from the Kennedy Bay Links scorecard.</p>
       </div>
 
       <div class="card" style="margin-bottom:18px;">
@@ -143,6 +143,7 @@
           <div class="lc-hole-field" id="score-field-losers-0"><label></label><input type="number" id="input-score-losers-0" min="1" inputmode="numeric"></div>
           <div class="lc-hole-field" id="score-field-losers-1"><label></label><input type="number" id="input-score-losers-1" min="1" inputmode="numeric"></div>
           <div class="lc-hole-field" id="score-field-losers-2"><label></label><input type="number" id="input-score-losers-2" min="1" inputmode="numeric"></div>
+          <div class="lc-hole-field" id="score-field-losers-3"><label></label><input type="number" id="input-score-losers-3" min="1" inputmode="numeric"></div>
         </div>
         <div class="lc-btn-row">
           <button class="btn btn-gold" id="btn-add-hole-losers">Add hole</button>
@@ -154,7 +155,7 @@
 
       <div class="card" style="margin-bottom:18px;">
         <h3 style="margin-top:0;">Standings</h3>
-        <table class="lc-standings" id="standings-table-losers"></table>
+        <div id="standings-losers"></div>
       </div>
 
       <div class="card">
@@ -201,542 +202,326 @@
     });
   }
 
-  /* ============================== FINAL (4 players) ============================== */
+  // Generic 4-player seeded bracket engine, shared by the Final and the
+  // Losers Flight. `cfg` describes the DOM id suffix, storage key, and the
+  // labels used for the two back-nine matches.
+  function makeBracketEngine(cfg) {
+    var state = null;
 
-  var FINAL_KEY = "kc-live-final4-v1";
-  var finalState = null;
-
-  function defaultFinalState() {
-    return {
-      players: [
-        { name: "Player 1", hcp: 0, rank: 1 },
-        { name: "Player 2", hcp: 0, rank: 2 },
-        { name: "Player 3", hcp: 0, rank: 3 },
-        { name: "Player 4", hcp: 0, rank: 4 }
-      ],
-      frontHoles: [], // up to 9: { si, scores: [s0,s1,s2,s3] }
-      backHoles: []   // up to 9: { si, scores: [s0,s1,s2,s3] }
-    };
-  }
-
-  function loadFinalState() {
-    try {
-      var raw = localStorage.getItem(FINAL_KEY);
-      if (raw) return JSON.parse(raw);
-    } catch (err) {}
-    return defaultFinalState();
-  }
-
-  function saveFinalState() {
-    try { localStorage.setItem(FINAL_KEY, JSON.stringify(finalState)); } catch (err) {}
-  }
-
-  function ranksValid() {
-    var ranks = finalState.players.map(function (p) { return Number(p.rank); });
-    var seen = {};
-    for (var i = 0; i < ranks.length; i++) {
-      var r = ranks[i];
-      if (r < 1 || r > 4 || seen[r]) return false;
-      seen[r] = true;
+    function defaultState() {
+      return {
+        players: [
+          { name: "Player 1", hcp: 0, rank: 1 },
+          { name: "Player 2", hcp: 0, rank: 2 },
+          { name: "Player 3", hcp: 0, rank: 3 },
+          { name: "Player 4", hcp: 0, rank: 4 }
+        ],
+        frontHoles: [], // up to 9: { si, scores: [s0,s1,s2,s3] }
+        backHoles: []   // up to 9: { si, scores: [s0,s1,s2,s3] }
+      };
     }
-    return true;
-  }
 
-  function getByRank(r) {
-    for (var i = 0; i < finalState.players.length; i++) {
-      if (Number(finalState.players[i].rank) === r) return i;
+    function loadState() {
+      try {
+        var raw = localStorage.getItem(cfg.key);
+        if (raw) return JSON.parse(raw);
+      } catch (err) {}
+      return defaultState();
     }
-    return -1;
-  }
 
-  function computeHeadToHead(a, b, holes) {
-    var holesA = 0, holesB = 0, halved = 0, played = 0;
-    holes.forEach(function (h) {
-      var sa = h.scores[a], sb = h.scores[b];
-      if (sa == null || sb == null) return;
-      played++;
-      var na = sa - strokesReceived(finalState.players[a].hcp, h.si);
-      var nb = sb - strokesReceived(finalState.players[b].hcp, h.si);
-      if (na < nb) holesA++;
-      else if (nb < na) holesB++;
-      else halved++;
-    });
-    return { holesA: holesA, holesB: holesB, halved: halved, played: played };
-  }
-
-  function matchWinner(a, b, holes, totalHoles, tieBreakByRank) {
-    var result = computeHeadToHead(a, b, holes);
-    if (result.played < totalHoles) return null;
-    if (result.holesA > result.holesB) return a;
-    if (result.holesB > result.holesA) return b;
-    if (tieBreakByRank) {
-      return (Number(finalState.players[a].rank) < Number(finalState.players[b].rank)) ? a : b;
+    function saveState() {
+      try { localStorage.setItem(cfg.key, JSON.stringify(state)); } catch (err) {}
     }
-    return null;
-  }
 
-  function matchBox(a, b, holes, totalHoles, tieBreakByRank) {
-    var result = computeHeadToHead(a, b, holes);
-    var nameA = escapeHtml(finalState.players[a].name || ("Player " + (a + 1)));
-    var nameB = escapeHtml(finalState.players[b].name || ("Player " + (b + 1)));
-    var status;
-    if (result.played === 0) {
-      status = "Not started";
-    } else if (result.played < totalHoles) {
-      var diff = result.holesA - result.holesB;
-      if (diff === 0) status = "All square thru " + result.played;
-      else status = (diff > 0 ? nameA : nameB) + " " + Math.abs(diff) + " up thru " + result.played;
-    } else {
-      if (result.holesA !== result.holesB) {
-        status = (result.holesA > result.holesB ? nameA : nameB) + " wins";
-      } else if (tieBreakByRank) {
-        var winnerIdx = (Number(finalState.players[a].rank) < Number(finalState.players[b].rank)) ? a : b;
-        status = escapeHtml(finalState.players[winnerIdx].name) + " wins (tied — higher starting rank)";
+    function ranksValid() {
+      var ranks = state.players.map(function (p) { return Number(p.rank); });
+      var seen = {};
+      for (var i = 0; i < ranks.length; i++) {
+        var r = ranks[i];
+        if (r < 1 || r > 4 || seen[r]) return false;
+        seen[r] = true;
+      }
+      return true;
+    }
+
+    function getByRank(r) {
+      for (var i = 0; i < state.players.length; i++) {
+        if (Number(state.players[i].rank) === r) return i;
+      }
+      return -1;
+    }
+
+    function computeHeadToHead(a, b, holes) {
+      var holesA = 0, holesB = 0, halved = 0, played = 0;
+      holes.forEach(function (h) {
+        var sa = h.scores[a], sb = h.scores[b];
+        if (sa == null || sb == null) return;
+        played++;
+        var na = sa - strokesReceived(state.players[a].hcp, h.si);
+        var nb = sb - strokesReceived(state.players[b].hcp, h.si);
+        if (na < nb) holesA++;
+        else if (nb < na) holesB++;
+        else halved++;
+      });
+      return { holesA: holesA, holesB: holesB, halved: halved, played: played };
+    }
+
+    function matchWinner(a, b, holes, totalHoles, tieBreakByRank) {
+      var result = computeHeadToHead(a, b, holes);
+      if (result.played < totalHoles) return null;
+      if (result.holesA > result.holesB) return a;
+      if (result.holesB > result.holesA) return b;
+      if (tieBreakByRank) {
+        return (Number(state.players[a].rank) < Number(state.players[b].rank)) ? a : b;
+      }
+      return null;
+    }
+
+    function matchBox(a, b, holes, totalHoles, tieBreakByRank) {
+      var result = computeHeadToHead(a, b, holes);
+      var nameA = escapeHtml(state.players[a].name || ("Player " + (a + 1)));
+      var nameB = escapeHtml(state.players[b].name || ("Player " + (b + 1)));
+      var status;
+      if (result.played === 0) {
+        status = "Not started";
+      } else if (result.played < totalHoles) {
+        var diff = result.holesA - result.holesB;
+        if (diff === 0) status = "All square thru " + result.played;
+        else status = (diff > 0 ? nameA : nameB) + " " + Math.abs(diff) + " up thru " + result.played;
       } else {
-        status = "Tied after 18 — playoff required (tournament director to decide format &amp; venue)";
+        if (result.holesA !== result.holesB) {
+          status = (result.holesA > result.holesB ? nameA : nameB) + " wins";
+        } else if (tieBreakByRank) {
+          var winnerIdx = (Number(state.players[a].rank) < Number(state.players[b].rank)) ? a : b;
+          status = escapeHtml(state.players[winnerIdx].name) + " wins (tied — higher starting rank)";
+        } else {
+          status = "Tied after 18 — playoff required (tournament director to decide format &amp; venue)";
+        }
+      }
+      return "<div class='format-match'>" + nameA + " <span class='vs'>VS</span> " + nameB +
+        "<div class='lc-status' style='margin-top:6px;'>" + status + "</div></div>";
+    }
+
+    function renderSetup() {
+      var grid = document.getElementById("setup-grid-" + cfg.id);
+      grid.innerHTML = "";
+      state.players.forEach(function (p, i) {
+        var nameLabel = document.createElement("label");
+        nameLabel.textContent = "Player " + (i + 1) + " name";
+        var nameInput = document.createElement("input");
+        nameInput.type = "text";
+        nameInput.value = p.name;
+        nameInput.addEventListener("input", function (e) {
+          state.players[i].name = e.target.value || ("Player " + (i + 1));
+          saveState();
+          renderScoreLabels();
+          renderStandings();
+          renderLog();
+        });
+
+        var hcpLabel = document.createElement("label");
+        hcpLabel.textContent = "HCP";
+        var hcpInput = document.createElement("input");
+        hcpInput.type = "number";
+        hcpInput.min = "0";
+        hcpInput.value = p.hcp;
+        hcpInput.addEventListener("input", function (e) {
+          state.players[i].hcp = Number(e.target.value) || 0;
+          saveState();
+          renderStandings();
+          renderLog();
+        });
+
+        var rankLabel = document.createElement("label");
+        rankLabel.textContent = "Starting rank (1–4)";
+        var rankSelect = document.createElement("select");
+        [1, 2, 3, 4].forEach(function (r) {
+          var opt = document.createElement("option");
+          opt.value = r;
+          opt.textContent = r;
+          if (Number(p.rank) === r) opt.selected = true;
+          rankSelect.appendChild(opt);
+        });
+        rankSelect.addEventListener("change", function (e) {
+          state.players[i].rank = Number(e.target.value);
+          saveState();
+          renderStandings();
+        });
+
+        grid.appendChild(nameLabel);
+        grid.appendChild(nameInput);
+        grid.appendChild(hcpLabel);
+        grid.appendChild(hcpInput);
+        grid.appendChild(rankLabel);
+        grid.appendChild(rankSelect);
+      });
+    }
+
+    function renderScoreLabels() {
+      state.players.forEach(function (p, i) {
+        var field = document.getElementById("score-field-" + cfg.id + "-" + i);
+        var label = field.querySelector("label");
+        label.textContent = p.name;
+      });
+    }
+
+    function currentStage() {
+      if (state.frontHoles.length < 9) return "front9";
+      if (state.backHoles.length < 9) return "back9";
+      return "done";
+    }
+
+    function renderHoleInputs() {
+      var stage = currentStage();
+      var heading = document.getElementById("hole-heading-" + cfg.id);
+      var info = document.getElementById("hole-info-" + cfg.id);
+      var status = document.getElementById("round-status-" + cfg.id);
+      var addBtn = document.getElementById("btn-add-hole-" + cfg.id);
+
+      for (var i = 0; i < 4; i++) { document.getElementById("input-score-" + cfg.id + "-" + i).value = ""; }
+
+      if (stage === "front9") {
+        var holeIdx = state.frontHoles.length;
+        heading.textContent = "Hole " + (holeIdx + 1);
+        var h = KENNEDY_BAY_HOLES[holeIdx];
+        info.textContent = "Par " + h.par + " / SI " + h.si;
+        addBtn.disabled = false; addBtn.style.opacity = "1";
+        status.textContent = "";
+      } else if (stage === "back9") {
+        var holeIdxBack = 9 + state.backHoles.length;
+        heading.textContent = "Hole " + (holeIdxBack + 1);
+        var hb = KENNEDY_BAY_HOLES[holeIdxBack];
+        info.textContent = "Par " + hb.par + " / SI " + hb.si;
+        addBtn.disabled = false; addBtn.style.opacity = "1";
+        status.textContent = state.backHoles.length === 0 ? "Front nine complete — see the back-nine pairings below." : "";
+      } else {
+        heading.textContent = cfg.doneLabel;
+        info.textContent = "—";
+        addBtn.disabled = true; addBtn.style.opacity = ".5";
+        status.textContent = "All 18 holes recorded.";
       }
     }
-    return "<div class='format-match'>" + nameA + " <span class='vs'>VS</span> " + nameB +
-      "<div class='lc-status' style='margin-top:6px;'>" + status + "</div></div>";
-  }
 
-  function renderSetupFinal() {
-    var grid = document.getElementById("setup-grid-final");
-    grid.innerHTML = "";
-    finalState.players.forEach(function (p, i) {
-      var nameLabel = document.createElement("label");
-      nameLabel.textContent = "Player " + (i + 1) + " name";
-      var nameInput = document.createElement("input");
-      nameInput.type = "text";
-      nameInput.value = p.name;
-      nameInput.addEventListener("input", function (e) {
-        finalState.players[i].name = e.target.value || ("Player " + (i + 1));
-        saveFinalState();
-        renderScoreLabelsFinal();
-        renderStandingsFinal();
-        renderLogFinal();
-      });
+    function renderStandings() {
+      var el = document.getElementById("standings-" + cfg.id);
+      if (!ranksValid()) {
+        el.innerHTML = "<p class='lc-note'>Enter a unique starting rank (1&ndash;4) for each player above before scoring begins.</p>";
+        return;
+      }
+      var rA = getByRank(1), rD = getByRank(4), rB = getByRank(2), rC = getByRank(3);
 
-      var hcpLabel = document.createElement("label");
-      hcpLabel.textContent = "HCP";
-      var hcpInput = document.createElement("input");
-      hcpInput.type = "number";
-      hcpInput.min = "0";
-      hcpInput.value = p.hcp;
-      hcpInput.addEventListener("input", function (e) {
-        finalState.players[i].hcp = Number(e.target.value) || 0;
-        saveFinalState();
-        renderStandingsFinal();
-        renderLogFinal();
-      });
+      var html = "<h4 class='lc-round-heading'>Front nine</h4>";
+      html += "<div class='format-matches' style='margin-bottom:18px;'>";
+      html += matchBox(rA, rD, state.frontHoles, 9, true);
+      html += matchBox(rB, rC, state.frontHoles, 9, true);
+      html += "</div>";
 
-      var rankLabel = document.createElement("label");
-      rankLabel.textContent = "Starting rank (1–4)";
-      var rankSelect = document.createElement("select");
-      [1, 2, 3, 4].forEach(function (r) {
-        var opt = document.createElement("option");
-        opt.value = r;
-        opt.textContent = r;
-        if (Number(p.rank) === r) opt.selected = true;
-        rankSelect.appendChild(opt);
-      });
-      rankSelect.addEventListener("change", function (e) {
-        finalState.players[i].rank = Number(e.target.value);
-        saveFinalState();
-        renderStandingsFinal();
-      });
+      if (state.frontHoles.length === 9) {
+        var winner1 = matchWinner(rA, rD, state.frontHoles, 9, true);
+        var winner2 = matchWinner(rB, rC, state.frontHoles, 9, true);
+        var loser1 = winner1 === rA ? rD : rA;
+        var loser2 = winner2 === rB ? rC : rB;
 
-      grid.appendChild(nameLabel);
-      grid.appendChild(nameInput);
-      grid.appendChild(hcpLabel);
-      grid.appendChild(hcpInput);
-      grid.appendChild(rankLabel);
-      grid.appendChild(rankSelect);
-    });
-  }
+        html += "<h4 class='lc-round-heading'>Back nine &mdash; " + cfg.winnersHeading + "</h4>";
+        html += "<div class='format-matches' style='margin-bottom:18px;'>" + matchBox(winner1, winner2, state.backHoles, 9, false) + "</div>";
+        html += "<h4 class='lc-round-heading'>Back nine &mdash; " + cfg.losersHeading + "</h4>";
+        html += "<div class='format-matches'>" + matchBox(loser1, loser2, state.backHoles, 9, false) + "</div>";
+      } else {
+        html += "<p class='lc-note'>Finish the front nine to reveal the back-nine pairings.</p>";
+      }
 
-  function renderScoreLabelsFinal() {
-    finalState.players.forEach(function (p, i) {
-      var field = document.getElementById("score-field-final-" + i);
-      var label = field.querySelector("label");
-      label.textContent = p.name;
-    });
-  }
-
-  function currentFinalStage() {
-    if (finalState.frontHoles.length < 9) return "front9";
-    if (finalState.backHoles.length < 9) return "back9";
-    return "done";
-  }
-
-  function renderHoleInputsFinal() {
-    var stage = currentFinalStage();
-    var heading = document.getElementById("hole-heading-final");
-    var info = document.getElementById("hole-info-final");
-    var status = document.getElementById("round-status-final");
-    var addBtn = document.getElementById("btn-add-hole-final");
-
-    for (var i = 0; i < 4; i++) { document.getElementById("input-score-final-" + i).value = ""; }
-
-    if (stage === "front9") {
-      var holeIdx = finalState.frontHoles.length;
-      heading.textContent = "Hole " + (holeIdx + 1);
-      var h = KENNEDY_BAY_HOLES[holeIdx];
-      info.textContent = "Par " + h.par + " / SI " + h.si;
-      addBtn.disabled = false; addBtn.style.opacity = "1";
-      status.textContent = "";
-    } else if (stage === "back9") {
-      var holeIdxBack = 9 + finalState.backHoles.length;
-      heading.textContent = "Hole " + (holeIdxBack + 1);
-      var hb = KENNEDY_BAY_HOLES[holeIdxBack];
-      info.textContent = "Par " + hb.par + " / SI " + hb.si;
-      addBtn.disabled = false; addBtn.style.opacity = "1";
-      status.textContent = finalState.backHoles.length === 0 ? "Front nine complete — see the back-nine pairings below." : "";
-    } else {
-      heading.textContent = "Final complete";
-      info.textContent = "—";
-      addBtn.disabled = true; addBtn.style.opacity = ".5";
-      status.textContent = "All 18 holes recorded.";
-    }
-  }
-
-  function renderStandingsFinal() {
-    var el = document.getElementById("standings-final");
-    if (!ranksValid()) {
-      el.innerHTML = "<p class='lc-note'>Enter a unique starting rank (1&ndash;4) for each player above before scoring begins.</p>";
-      return;
-    }
-    var rA = getByRank(1), rD = getByRank(4), rB = getByRank(2), rC = getByRank(3);
-
-    var html = "<h4 class='lc-round-heading'>Front nine</h4>";
-    html += "<div class='format-matches' style='margin-bottom:18px;'>";
-    html += matchBox(rA, rD, finalState.frontHoles, 9, true);
-    html += matchBox(rB, rC, finalState.frontHoles, 9, true);
-    html += "</div>";
-
-    if (finalState.frontHoles.length === 9) {
-      var winner1 = matchWinner(rA, rD, finalState.frontHoles, 9, true);
-      var winner2 = matchWinner(rB, rC, finalState.frontHoles, 9, true);
-      var loser1 = winner1 === rA ? rD : rA;
-      var loser2 = winner2 === rB ? rC : rB;
-
-      html += "<h4 class='lc-round-heading'>Back nine &mdash; Final (for the Cup)</h4>";
-      html += "<div class='format-matches' style='margin-bottom:18px;'>" + matchBox(winner1, winner2, finalState.backHoles, 9, false) + "</div>";
-      html += "<h4 class='lc-round-heading'>Back nine &mdash; 3rd/4th playoff</h4>";
-      html += "<div class='format-matches'>" + matchBox(loser1, loser2, finalState.backHoles, 9, false) + "</div>";
-    } else {
-      html += "<p class='lc-note'>Finish the front nine to reveal the back-nine pairings.</p>";
+      el.innerHTML = html;
     }
 
-    el.innerHTML = html;
-  }
-
-  function renderLogFinal() {
-    var table = document.getElementById("log-table-final");
-    var allHoles = finalState.frontHoles.concat(finalState.backHoles);
-    if (allHoles.length === 0) {
-      table.innerHTML = "<tr><td class='lc-empty'>No holes recorded yet.</td></tr>";
-      return;
-    }
-    var html = "<tr><th>Hole</th><th>SI</th>";
-    finalState.players.forEach(function (p) { html += "<th>" + escapeHtml(p.name) + "</th>"; });
-    html += "</tr>";
-    allHoles.forEach(function (hole, idx) {
-      html += "<tr><td>" + (idx + 1) + "</td><td>" + hole.si + "</td>";
-      hole.scores.forEach(function (g, i) {
-        var net = g - strokesReceived(finalState.players[i].hcp, hole.si);
-        html += "<td>" + g + " (" + net + ")</td>";
-      });
+    function renderLog() {
+      var table = document.getElementById("log-table-" + cfg.id);
+      var allHoles = state.frontHoles.concat(state.backHoles);
+      if (allHoles.length === 0) {
+        table.innerHTML = "<tr><td class='lc-empty'>No holes recorded yet.</td></tr>";
+        return;
+      }
+      var html = "<tr><th>Hole</th><th>SI</th>";
+      state.players.forEach(function (p) { html += "<th>" + escapeHtml(p.name) + "</th>"; });
       html += "</tr>";
+      allHoles.forEach(function (hole, idx) {
+        html += "<tr><td>" + (idx + 1) + "</td><td>" + hole.si + "</td>";
+        hole.scores.forEach(function (g, i) {
+          var net = g - strokesReceived(state.players[i].hcp, hole.si);
+          html += "<td>" + g + " (" + net + ")</td>";
+        });
+        html += "</tr>";
+      });
+      table.innerHTML = html;
+    }
+
+    function renderAll() {
+      renderSetup();
+      renderScoreLabels();
+      renderHoleInputs();
+      renderStandings();
+      renderLog();
+    }
+
+    document.getElementById("btn-add-hole-" + cfg.id).addEventListener("click", function () {
+      if (!ranksValid()) { alert("Enter a unique starting rank (1-4) for each player first."); return; }
+      var stage = currentStage();
+      if (stage === "done") return;
+      var holesArr = stage === "front9" ? state.frontHoles : state.backHoles;
+      var holeIdxGlobal = stage === "front9" ? state.frontHoles.length : 9 + state.backHoles.length;
+      var si = KENNEDY_BAY_HOLES[holeIdxGlobal].si;
+      var scores = [0, 1, 2, 3].map(function (i) { return document.getElementById("input-score-" + cfg.id + "-" + i).value; });
+      if (scores.some(function (s) { return s === "" || Number(s) <= 0; })) { alert("Enter a score for all four players."); return; }
+      holesArr.push({ si: si, scores: scores.map(Number) });
+      saveState();
+      renderHoleInputs();
+      renderStandings();
+      renderLog();
     });
-    table.innerHTML = html;
+
+    document.getElementById("btn-undo-" + cfg.id).addEventListener("click", function () {
+      if (state.backHoles.length > 0) state.backHoles.pop();
+      else if (state.frontHoles.length > 0) state.frontHoles.pop();
+      else return;
+      saveState();
+      renderHoleInputs();
+      renderStandings();
+      renderLog();
+    });
+
+    document.getElementById("btn-reset-" + cfg.id).addEventListener("click", function () {
+      if (!confirm(cfg.resetConfirm)) return;
+      state.frontHoles = [];
+      state.backHoles = [];
+      saveState();
+      renderHoleInputs();
+      renderStandings();
+      renderLog();
+    });
+
+    state = loadState();
+    renderAll();
   }
 
-  function renderAllFinal() {
-    renderSetupFinal();
-    renderScoreLabelsFinal();
-    renderHoleInputsFinal();
-    renderStandingsFinal();
-    renderLogFinal();
-  }
+  /* ============================== FINAL (4 players) ============================== */
 
-  document.getElementById("btn-add-hole-final").addEventListener("click", function () {
-    if (!ranksValid()) { alert("Enter a unique starting rank (1-4) for each player first."); return; }
-    var stage = currentFinalStage();
-    if (stage === "done") return;
-    var holesArr = stage === "front9" ? finalState.frontHoles : finalState.backHoles;
-    var holeIdxGlobal = stage === "front9" ? finalState.frontHoles.length : 9 + finalState.backHoles.length;
-    var si = KENNEDY_BAY_HOLES[holeIdxGlobal].si;
-    var scores = [0, 1, 2, 3].map(function (i) { return document.getElementById("input-score-final-" + i).value; });
-    if (scores.some(function (s) { return s === "" || Number(s) <= 0; })) { alert("Enter a score for all four players."); return; }
-    holesArr.push({ si: si, scores: scores.map(Number) });
-    saveFinalState();
-    renderHoleInputsFinal();
-    renderStandingsFinal();
-    renderLogFinal();
+  makeBracketEngine({
+    id: "final",
+    key: "kc-live-final4-v1",
+    doneLabel: "Final complete",
+    winnersHeading: "Final (for the Cup)",
+    losersHeading: "3rd/4th playoff",
+    resetConfirm: "Reset all holes and scores for the Final? Player names, handicaps and ranks are kept."
   });
 
-  document.getElementById("btn-undo-final").addEventListener("click", function () {
-    if (finalState.backHoles.length > 0) finalState.backHoles.pop();
-    else if (finalState.frontHoles.length > 0) finalState.frontHoles.pop();
-    else return;
-    saveFinalState();
-    renderHoleInputsFinal();
-    renderStandingsFinal();
-    renderLogFinal();
-  });
+  /* ============================== LOSERS FLIGHT (4 players, same bracket format) ============================== */
 
-  document.getElementById("btn-reset-final").addEventListener("click", function () {
-    if (!confirm("Reset all holes and scores for the Final? Player names, handicaps and ranks are kept.")) return;
-    finalState.frontHoles = [];
-    finalState.backHoles = [];
-    saveFinalState();
-    renderHoleInputsFinal();
-    renderStandingsFinal();
-    renderLogFinal();
-  });
-
-  /* ============================== LOSERS FLIGHT (3 players, round robin) ============================== */
-
-  var LOSERS_KEY = "kc-live-losers-v1";
-  var losersState = null;
-  var PAIRS = [[0, 1], [0, 2], [1, 2]];
-
-  function defaultLosersState() {
-    return {
-      players: [
-        { name: "Player 1", hcp: 0 },
-        { name: "Player 2", hcp: 0 },
-        { name: "Player 3", hcp: 0 }
-      ],
-      holes: [] // { si, scores: [g0, g1, g2] }
-    };
-  }
-
-  function loadLosersState() {
-    try {
-      var raw = localStorage.getItem(LOSERS_KEY);
-      if (raw) return JSON.parse(raw);
-    } catch (err) {}
-    return defaultLosersState();
-  }
-
-  function saveLosersState() {
-    try { localStorage.setItem(LOSERS_KEY, JSON.stringify(losersState)); } catch (err) {}
-  }
-
-  function computeLosersMatches() {
-    var matches = PAIRS.map(function () {
-      return { holesA: 0, holesB: 0, halved: 0, played: 0, decided: false, decidedMargin: "" };
-    });
-
-    losersState.holes.forEach(function (hole) {
-      var nets = hole.scores.map(function (g, i) {
-        if (g === null || g === undefined || g === "") return null;
-        return g - strokesReceived(losersState.players[i].hcp, hole.si);
-      });
-
-      PAIRS.forEach(function (pair, pIdx) {
-        var a = pair[0], b = pair[1];
-        var m = matches[pIdx];
-        if (nets[a] === null || nets[b] === null) return;
-        if (m.decided) { m.played++; return; }
-        m.played++;
-        if (nets[a] < nets[b]) m.holesA++;
-        else if (nets[b] < nets[a]) m.holesB++;
-        else m.halved++;
-
-        var remaining = 18 - m.played;
-        var diff = Math.abs(m.holesA - m.holesB);
-        if (diff > remaining) {
-          m.decided = true;
-          m.decidedMargin = diff + "&" + remaining;
-        }
-      });
-    });
-
-    return matches;
-  }
-
-  function losersMatchPoints(m) {
-    if (m.holesA > m.holesB) return [2, 0];
-    if (m.holesB > m.holesA) return [0, 2];
-    if (m.played === 0) return [null, null];
-    return [1, 1];
-  }
-
-  function losersMatchStatusText(m, perspective) {
-    if (m.played === 0) return "Not started";
-    var diff = perspective === "A" ? (m.holesA - m.holesB) : (m.holesB - m.holesA);
-    if (m.decided) {
-      return diff > 0 ? "Won " + m.decidedMargin : "Lost " + m.decidedMargin;
-    }
-    if (diff === 0) return "All square";
-    return diff > 0 ? diff + " up" : Math.abs(diff) + " down";
-  }
-
-  function renderSetupLosers() {
-    var grid = document.getElementById("setup-grid-losers");
-    grid.innerHTML = "";
-    losersState.players.forEach(function (p, i) {
-      var nameLabel = document.createElement("label");
-      nameLabel.textContent = "Player " + (i + 1) + " name";
-      var nameInput = document.createElement("input");
-      nameInput.type = "text";
-      nameInput.value = p.name;
-      nameInput.addEventListener("input", function (e) {
-        losersState.players[i].name = e.target.value || ("Player " + (i + 1));
-        saveLosersState();
-        renderScoreLabelsLosers();
-        renderStandingsLosers();
-        renderLogLosers();
-      });
-
-      var hcpLabel = document.createElement("label");
-      hcpLabel.textContent = "HCP";
-      var hcpInput = document.createElement("input");
-      hcpInput.type = "number";
-      hcpInput.min = "0";
-      hcpInput.value = p.hcp;
-      hcpInput.addEventListener("input", function (e) {
-        losersState.players[i].hcp = Number(e.target.value) || 0;
-        saveLosersState();
-        renderStandingsLosers();
-        renderLogLosers();
-      });
-
-      grid.appendChild(nameLabel);
-      grid.appendChild(nameInput);
-      grid.appendChild(hcpLabel);
-      grid.appendChild(hcpInput);
-    });
-  }
-
-  function renderScoreLabelsLosers() {
-    losersState.players.forEach(function (p, i) {
-      var field = document.getElementById("score-field-losers-" + i);
-      var label = field.querySelector("label");
-      label.textContent = p.name;
-    });
-  }
-
-  function renderHoleInputsLosers() {
-    var holeIdx = losersState.holes.length;
-    var holeNum = holeIdx + 1;
-    document.getElementById("hole-heading-losers").textContent =
-      holeNum <= 18 ? "Hole " + holeNum : "Round complete";
-    var info = document.getElementById("hole-info-losers");
-    if (holeNum <= 18) {
-      var h = KENNEDY_BAY_HOLES[holeIdx];
-      info.textContent = "Par " + h.par + " / SI " + h.si;
-    } else {
-      info.textContent = "—";
-    }
-    for (var i = 0; i < 3; i++) {
-      document.getElementById("input-score-losers-" + i).value = "";
-    }
-    var addBtn = document.getElementById("btn-add-hole-losers");
-    var status = document.getElementById("round-status-losers");
-    if (holeNum > 18) {
-      addBtn.disabled = true;
-      addBtn.style.opacity = ".5";
-      status.textContent = "All 18 holes recorded.";
-    } else {
-      addBtn.disabled = false;
-      addBtn.style.opacity = "1";
-      status.textContent = "";
-    }
-  }
-
-  function renderStandingsLosers() {
-    var matches = computeLosersMatches();
-    var totals = [0, 0, 0];
-    var perPlayerMatches = [[], [], []];
-
-    PAIRS.forEach(function (pair, idx) {
-      var a = pair[0], b = pair[1];
-      var m = matches[idx];
-      var pts = losersMatchPoints(m);
-      var ptsA = pts[0], ptsB = pts[1];
-      if (ptsA !== null) { totals[a] += ptsA; totals[b] += ptsB; }
-      perPlayerMatches[a].push({ text: "vs " + losersState.players[b].name, status: losersMatchStatusText(m, "A") });
-      perPlayerMatches[b].push({ text: "vs " + losersState.players[a].name, status: losersMatchStatusText(m, "B") });
-    });
-
-    var order = [0, 1, 2].sort(function (x, y) { return totals[y] - totals[x]; });
-    var maxTotal = Math.max.apply(null, totals);
-
-    var table = document.getElementById("standings-table-losers");
-    var html = "<tr><th>Player</th><th>Match 1</th><th>Match 2</th><th>Total</th></tr>";
-    order.forEach(function (i) {
-      var isLeader = totals[i] === maxTotal && maxTotal > 0;
-      html += "<tr class=\"" + (isLeader ? "lc-leader" : "") + "\">";
-      html += "<td class=\"lc-name\">" + escapeHtml(losersState.players[i].name) + "</td>";
-      perPlayerMatches[i].forEach(function (pm) {
-        html += "<td>" + escapeHtml(pm.text) + "<span class=\"lc-status\">" + escapeHtml(pm.status) + "</span></td>";
-      });
-      html += "<td class=\"lc-total\">" + totals[i] + "</td>";
-      html += "</tr>";
-    });
-    table.innerHTML = html;
-  }
-
-  function renderLogLosers() {
-    var table = document.getElementById("log-table-losers");
-    if (losersState.holes.length === 0) {
-      table.innerHTML = "<tr><td class=\"lc-empty\">No holes recorded yet.</td></tr>";
-      return;
-    }
-    var html = "<tr><th>Hole</th><th>SI</th>";
-    losersState.players.forEach(function (p) { html += "<th>" + escapeHtml(p.name) + "</th>"; });
-    html += "</tr>";
-    losersState.holes.forEach(function (hole, idx) {
-      html += "<tr><td>" + (idx + 1) + "</td><td>" + hole.si + "</td>";
-      hole.scores.forEach(function (g, i) {
-        var net = g - strokesReceived(losersState.players[i].hcp, hole.si);
-        html += "<td>" + g + " (" + net + ")</td>";
-      });
-      html += "</tr>";
-    });
-    table.innerHTML = html;
-  }
-
-  function renderAllLosers() {
-    renderSetupLosers();
-    renderScoreLabelsLosers();
-    renderHoleInputsLosers();
-    renderStandingsLosers();
-    renderLogLosers();
-  }
-
-  document.getElementById("btn-add-hole-losers").addEventListener("click", function () {
-    if (losersState.holes.length >= 18) return;
-    var si = KENNEDY_BAY_HOLES[losersState.holes.length].si;
-    var scores = [0, 1, 2].map(function (i) { return document.getElementById("input-score-losers-" + i).value; });
-    if (scores.some(function (s) { return s === "" || Number(s) <= 0; })) { alert("Enter a score for all three players."); return; }
-    losersState.holes.push({ si: si, scores: scores.map(Number) });
-    saveLosersState();
-    renderHoleInputsLosers();
-    renderStandingsLosers();
-    renderLogLosers();
-  });
-
-  document.getElementById("btn-undo-losers").addEventListener("click", function () {
-    if (losersState.holes.length === 0) return;
-    losersState.holes.pop();
-    saveLosersState();
-    renderHoleInputsLosers();
-    renderStandingsLosers();
-    renderLogLosers();
-  });
-
-  document.getElementById("btn-reset-losers").addEventListener("click", function () {
-    if (!confirm("Reset all holes and scores for the Losers Flight? Player names and handicaps are kept.")) return;
-    losersState.holes = [];
-    saveLosersState();
-    renderHoleInputsLosers();
-    renderStandingsLosers();
-    renderLogLosers();
+  makeBracketEngine({
+    id: "losers",
+    key: "kc-live-losers4-v1",
+    doneLabel: "Losers Flight complete",
+    winnersHeading: "5th place playoff",
+    losersHeading: "7th place playoff",
+    resetConfirm: "Reset all holes and scores for the Losers Flight? Player names, handicaps and ranks are kept."
   });
 
   /* ============================== TABS ============================== */
@@ -754,11 +539,6 @@
     document.getElementById("tab-losers").classList.add("active");
     document.getElementById("tab-final").classList.remove("active");
   });
-
-  finalState = loadFinalState();
-  losersState = loadLosersState();
-  renderAllFinal();
-  renderAllLosers();
 })();
 </script>
 </body>
