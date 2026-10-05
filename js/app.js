@@ -6,7 +6,8 @@ const NAV_LINKS = [
   { href: "format.html", label: "Playing Format" },
   { href: "calculator.html", label: "Live Scorer" },
   { href: "results.html", label: "Rankings" },
-  { href: "history.html", label: "History" }
+  { href: "history.html", label: "History" },
+  { href: "rules.html", label: "Rules" }
 ];
 
 function currentPage() {
