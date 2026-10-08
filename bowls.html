@@ -1,0 +1,436 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Lawn Bowls | Kangaroo Cup</title>
+<meta name="theme-color" content="#1f6b3a">
+<link rel="manifest" href="manifest.json">
+<link rel="icon" href="assets/img/favicon-32-v2.png">
+<link rel="apple-touch-icon" href="assets/img/apple-touch-icon-v2.png">
+<link rel="stylesheet" href="css/style.css">
+<style>
+  .bw-btn-secondary {
+    background:transparent; color:var(--green-dark); border:2px solid var(--green);
+    padding:10px 20px; border-radius:30px; font-weight:600; font-size:.88rem; cursor:pointer;
+    font-family:inherit;
+  }
+  .bw-btn-secondary:active { transform:scale(.97); }
+  .bw-btn-danger { border-color:#b23b3b; color:#b23b3b; }
+  .bw-note { font-size:.82rem; color:var(--muted); margin:10px 0 0; line-height:1.5; }
+
+  .bw-banner {
+    border-radius:var(--radius); padding:14px 18px; margin-bottom:16px;
+    background:var(--cream); border:1px solid #eee5cf; font-size:.92rem; line-height:1.5;
+  }
+  .bw-banner strong { color:var(--green-dark); }
+  .bw-banner.gold { background:linear-gradient(135deg,#fff 0%,#fdf8e8 100%); border:2px solid var(--gold); }
+  .bw-banner.ready { background:var(--green); color:#fff; border-color:var(--green-dark); }
+  .bw-banner.ready strong { color:var(--gold); }
+
+  .bw-round-head { display:flex; justify-content:space-between; align-items:baseline; flex-wrap:wrap; gap:6px; margin-bottom:12px; }
+  .bw-round-head h3 { margin:0; color:var(--green-dark); font-size:1.2rem; }
+  .bw-progress { font-size:.82rem; color:var(--muted); font-weight:600; }
+
+  .bw-match { border:1px solid #eee5cf; border-radius:12px; padding:14px; margin-bottom:14px; background:#fff; }
+  .bw-match.done { background:#f6fbf5; border-color:#bcd9bf; }
+  .bw-lane { font-size:.7rem; font-weight:800; letter-spacing:1px; text-transform:uppercase; color:var(--gold-dark); margin-bottom:6px; }
+  .bw-vs { display:flex; align-items:center; justify-content:space-between; gap:8px; margin-bottom:6px; }
+  .bw-player { flex:1; font-weight:800; color:var(--green-dark); font-size:1.05rem; }
+  .bw-player.right { text-align:right; }
+  .bw-score { font-family:Georgia,serif; font-weight:800; font-size:1.5rem; color:var(--green-dark); white-space:nowrap; }
+  .bw-status { font-size:.78rem; font-weight:700; color:var(--muted); margin-bottom:8px; }
+  .bw-status.win { color:var(--green); }
+
+  .bw-end { padding:8px 0; border-top:1px dashed #eee5cf; }
+  .bw-end-label { font-size:.72rem; font-weight:700; color:var(--muted); text-transform:uppercase; margin-bottom:5px; }
+  .bw-end-btns { display:flex; gap:6px; }
+  .bw-pick, .bw-shot {
+    border:2px solid #ddd3b6; background:#fff; color:var(--green-dark); border-radius:10px;
+    font-weight:700; font-size:.88rem; padding:9px 6px; cursor:pointer; font-family:inherit;
+  }
+  .bw-pick { flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .bw-pick.x { flex:0 0 64px; color:var(--muted); }
+  .bw-pick.sel, .bw-shot.sel { background:var(--green); border-color:var(--green-dark); color:#fff; }
+  .bw-pick.x.sel { background:#8a8f85; border-color:#6b7566; }
+  .bw-shots { display:flex; gap:6px; margin-top:6px; align-items:center; }
+  .bw-shots span { font-size:.72rem; font-weight:700; color:var(--muted); margin-right:2px; }
+  .bw-shot { flex:1; padding:8px 0; }
+
+  .bw-table { width:100%; border-collapse:collapse; }
+  .bw-table th, .bw-table td { padding:9px 6px; text-align:center; border-bottom:1px solid #eee5cf; font-size:.88rem; }
+  .bw-table th { color:var(--muted); font-weight:700; font-size:.7rem; text-transform:uppercase; }
+  .bw-table td.name { text-align:left; font-weight:700; color:var(--green-dark); }
+  .bw-table td.pts { font-weight:800; color:var(--green-dark); }
+  .bw-table tr.top td.name { color:var(--gold-dark); }
+
+  .bw-chips { display:flex; flex-wrap:wrap; gap:8px; margin-top:8px; }
+  .bw-chip { background:var(--cream); border:1px solid #eee5cf; border-radius:20px; padding:5px 13px; font-size:.82rem; font-weight:600; color:var(--green-dark); }
+  .bw-hist-round { margin-bottom:14px; }
+  .bw-hist-round h4 { margin:0 0 4px; color:var(--green-dark); font-size:.95rem; }
+  .bw-hist-line { font-size:.88rem; padding:2px 0; }
+  .bw-champ { text-align:center; padding:22px 16px; }
+  .bw-champ .name { font-family:Georgia,serif; font-size:2rem; font-weight:800; color:var(--green-dark); margin:6px 0; }
+  .bw-btn-row { display:flex; gap:10px; flex-wrap:wrap; margin-top:12px; }
+</style>
+</head>
+<body>
+
+<div id="site-header"></div>
+
+<main class="wrap" style="padding-top:40px;">
+
+  <section class="format-hero">
+    <h2 style="border:none; padding-bottom:0;">Lawn Bowls</h2>
+    <p class="subtitle">Friday 16 October, 4pm &middot; Sorrento Bowling Club</p>
+  </section>
+
+  <section style="margin-bottom:22px;">
+    <div class="card">
+      <h3 style="margin-top:0; color:var(--green-dark);">How it works</h3>
+      <ul style="margin:0; padding-left:18px; line-height:1.6;">
+        <li>9 players, 4 lanes, one-on-one. Four matches run at the same time, so one player waits each round and <strong>fetches the beers</strong>.</li>
+        <li>Each match is 3 ends. Everyone rolls 4 bowls per end. You score 1 shot for every bowl that is closer to the jack than your opponent's nearest (max 4 per end).</li>
+        <li>Win = 2 points, draw = 1, loss = 0. Shot difference breaks ties.</li>
+        <li>Round 1 is pre-drawn. Rounds 2 to 4 pair players by the standings (1st v 2nd, 3rd v 4th and so on), no rematches. The lowest-ranked player who hasn't waited yet fetches the beers.</li>
+        <li>Nobody starts the next round until every match is finished.</li>
+        <li>After Round 4 the top 2 play the final on their own (3 ends, one sudden-death end if it's a draw). Everyone else watches.</li>
+      </ul>
+    </div>
+  </section>
+
+  <section id="bw-app"></section>
+
+</main>
+
+<div id="site-footer"></div>
+
+<script src="js/data.js"></script>
+<script src="js/app.js"></script>
+<script>
+(function () {
+  var PLAYERS = ["Huub", "Juriaan", "Alex", "Casper", "Olaf B.", "Mack", "Olaf K.", "Gijs", "Eege"];
+  var ROUND1 = [["Huub", "Olaf K."], ["Juriaan", "Casper"], ["Alex", "Mack"], ["Olaf B.", "Gijs"]];
+  var WAITER1 = "Eege";
+  var SWISS_ROUNDS = 4;
+  var ENDS = 3;
+  var KEY = "kc-bowls-2026-v1";
+  var state;
+
+  function esc(s) { return String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;"); }
+
+  function newMatch(lane, a, b) { return { lane: lane, a: a, b: b, ends: [] }; }
+
+  function freshState() {
+    return {
+      rounds: [{
+        n: 1, kind: "swiss", waiter: WAITER1,
+        matches: ROUND1.map(function (p, i) { return newMatch(i + 1, p[0], p[1]); })
+      }],
+      manual: {}
+    };
+  }
+
+  function load() {
+    try {
+      var raw = localStorage.getItem(KEY);
+      if (raw) {
+        var s = JSON.parse(raw);
+        if (s && s.rounds && s.rounds.length) { if (!s.manual) s.manual = {}; return s; }
+      }
+    } catch (e) {}
+    return freshState();
+  }
+
+  function save() { try { localStorage.setItem(KEY, JSON.stringify(state)); } catch (e) {} }
+
+  /* ---------- scoring ---------- */
+  function endDone(e) { return !!e && (e.w === "x" || ((e.w === "a" || e.w === "b") && e.s >= 1)); }
+
+  function totalsN(m, n) {
+    var a = 0, b = 0;
+    for (var i = 0; i < n; i++) {
+      var e = m.ends[i];
+      if (!e) continue;
+      if (e.w === "a") a += e.s; else if (e.w === "b") b += e.s;
+    }
+    return { a: a, b: b };
+  }
+
+  function neededEnds(m, kind) {
+    var n = ENDS;
+    if (kind !== "final") return n;
+    while (n < 40) {
+      for (var i = 0; i < n; i++) { if (!endDone(m.ends[i])) return n; }
+      var t = totalsN(m, n);
+      if (t.a !== t.b) return n;
+      n++;
+    }
+    return n;
+  }
+
+  function matchStatus(m, kind) {
+    var n = neededEnds(m, kind);
+    var all = true;
+    for (var i = 0; i < n; i++) { if (!endDone(m.ends[i])) { all = false; break; } }
+    var t = totalsN(m, n);
+    var complete = all && (kind !== "final" || t.a !== t.b);
+    var result = null;
+    if (complete) result = t.a > t.b ? "a" : (t.b > t.a ? "b" : "draw");
+    return { n: n, a: t.a, b: t.b, complete: complete, result: result };
+  }
+
+  function roundComplete(r) {
+    return r.matches.every(function (m) { return matchStatus(m, r.kind).complete; });
+  }
+
+  /* ---------- standings ---------- */
+  function cmp(x, y) {
+    return (y.pts - x.pts) || (y.diff - x.diff) || (y.sf - x.sf) || (y.man - x.man) || (x.seed - y.seed);
+  }
+  function tiedKey(r) { return r.pts + "|" + r.diff + "|" + r.sf + "|" + r.man; }
+
+  function standings() {
+    var rec = {};
+    PLAYERS.forEach(function (p, i) { rec[p] = { name: p, seed: i, p: 0, w: 0, d: 0, l: 0, pts: 0, sf: 0, sa: 0 }; });
+    state.rounds.forEach(function (r) {
+      if (r.kind !== "swiss") return;
+      r.matches.forEach(function (m) {
+        var st = matchStatus(m, r.kind);
+        if (!st.complete) return;
+        var A = rec[m.a], B = rec[m.b];
+        A.p++; B.p++;
+        A.sf += st.a; A.sa += st.b; B.sf += st.b; B.sa += st.a;
+        if (st.result === "a") { A.w++; A.pts += 2; B.l++; }
+        else if (st.result === "b") { B.w++; B.pts += 2; A.l++; }
+        else { A.d++; B.d++; A.pts++; B.pts++; }
+      });
+    });
+    var list = PLAYERS.map(function (p) {
+      var r = rec[p]; r.diff = r.sf - r.sa; r.man = state.manual[p] || 0; return r;
+    });
+    list.sort(cmp);
+    return list;
+  }
+
+  function tieGroup() {
+    var S = standings();
+    if (S.length < 3 || tiedKey(S[1]) !== tiedKey(S[2])) return null;
+    var k = tiedKey(S[1]);
+    return S.filter(function (r) { return tiedKey(r) === k; }).map(function (r) { return r.name; });
+  }
+
+  /* ---------- pairing ---------- */
+  function playedPairs() {
+    var set = {};
+    state.rounds.forEach(function (r) {
+      if (r.kind !== "swiss") return;
+      r.matches.forEach(function (m) { set[m.a + "|" + m.b] = 1; set[m.b + "|" + m.a] = 1; });
+    });
+    return set;
+  }
+
+  function pairUp(list, played, allowRepeat) {
+    if (!list.length) return [];
+    var first = list[0];
+    for (var i = 1; i < list.length; i++) {
+      var o = list[i];
+      if (!allowRepeat && played[first + "|" + o]) continue;
+      var rest = list.slice(1, i).concat(list.slice(i + 1));
+      var sub = pairUp(rest, played, allowRepeat);
+      if (sub) return [[first, o]].concat(sub);
+    }
+    return null;
+  }
+
+  function nextSwissRound() {
+    var S = standings();
+    var waited = {};
+    state.rounds.forEach(function (r) { if (r.waiter) waited[r.waiter] = 1; });
+    var waiter = null;
+    for (var i = S.length - 1; i >= 0; i--) { if (!waited[S[i].name]) { waiter = S[i].name; break; } }
+    var names = S.map(function (r) { return r.name; }).filter(function (n) { return n !== waiter; });
+    var played = playedPairs();
+    var pairs = pairUp(names, played, false) || pairUp(names, played, true);
+    return {
+      n: state.rounds.length + 1, kind: "swiss", waiter: waiter,
+      matches: pairs.map(function (p, i) { return newMatch(i + 1, p[0], p[1]); })
+    };
+  }
+
+  function finalRound() {
+    var S = standings();
+    var a = S[0].name, b = S[1].name;
+    return {
+      n: state.rounds.length + 1, kind: "final", waiter: null,
+      spectators: PLAYERS.filter(function (p) { return p !== a && p !== b; }),
+      matches: [newMatch(1, a, b)]
+    };
+  }
+
+  function ensureNext() {
+    var last = state.rounds[state.rounds.length - 1];
+    if (last.kind === "final" || !roundComplete(last)) return;
+    if (last.n < SWISS_ROUNDS) state.rounds.push(nextSwissRound());
+    else if (!tieGroup()) state.rounds.push(finalRound());
+  }
+
+  /* ---------- rendering ---------- */
+  function endsHTML(ri, mi, m, kind) {
+    var st = matchStatus(m, kind), html = "";
+    for (var i = 0; i < st.n; i++) {
+      var e = m.ends[i] || null;
+      var label = i < ENDS ? "End " + (i + 1) : "Sudden death";
+      var d = ' data-r="' + ri + '" data-m="' + mi + '" data-e="' + i + '"';
+      html += '<div class="bw-end"><div class="bw-end-label">' + label + '</div><div class="bw-end-btns">';
+      html += '<button class="bw-pick' + (e && e.w === "a" ? " sel" : "") + '" data-act="w" data-w="a"' + d + '>' + esc(m.a) + '</button>';
+      html += '<button class="bw-pick x' + (e && e.w === "x" ? " sel" : "") + '" data-act="w" data-w="x"' + d + '>Blank</button>';
+      html += '<button class="bw-pick' + (e && e.w === "b" ? " sel" : "") + '" data-act="w" data-w="b"' + d + '>' + esc(m.b) + '</button>';
+      html += '</div>';
+      if (e && (e.w === "a" || e.w === "b")) {
+        html += '<div class="bw-shots"><span>Shots</span>';
+        for (var s = 1; s <= 4; s++) {
+          html += '<button class="bw-shot' + (e.s === s ? " sel" : "") + '" data-act="s" data-s="' + s + '"' + d + '>' + s + '</button>';
+        }
+        html += '</div>';
+      }
+      html += '</div>';
+    }
+    return html;
+  }
+
+  function resultText(m, st) {
+    if (!st.complete) return "";
+    if (st.result === "draw") return "Draw";
+    return (st.result === "a" ? m.a : m.b) + " wins";
+  }
+
+  function matchHTML(ri, mi, r) {
+    var m = r.matches[mi], st = matchStatus(m, r.kind);
+    var h = '<div class="bw-match' + (st.complete ? " done" : "") + '">';
+    h += '<div class="bw-lane">Lane ' + m.lane + (r.kind === "final" ? " &middot; Final" : "") + '</div>';
+    h += '<div class="bw-vs"><div class="bw-player">' + esc(m.a) + '</div><div class="bw-score">' + st.a + ' - ' + st.b + '</div><div class="bw-player right">' + esc(m.b) + '</div></div>';
+    h += '<div class="bw-status' + (st.complete ? " win" : "") + '">' + (st.complete ? resultText(m, st) : "Playing...") + '</div>';
+    h += endsHTML(ri, mi, m, r.kind);
+    h += '</div>';
+    return h;
+  }
+
+  function currentRoundHTML() {
+    var ri = state.rounds.length - 1, r = state.rounds[ri];
+    var done = r.matches.filter(function (m) { return matchStatus(m, r.kind).complete; }).length;
+    var h = '<div class="card" style="margin-bottom:18px;">';
+    h += '<div class="bw-round-head"><h3>' + (r.kind === "final" ? "Final" : "Round " + r.n + " of " + SWISS_ROUNDS) + '</h3>';
+    h += '<span class="bw-progress">' + done + ' of ' + r.matches.length + ' match' + (r.matches.length === 1 ? "" : "es") + ' finished</span></div>';
+
+    if (r.kind === "final") {
+      h += '<div class="bw-banner gold"><strong>Everyone else watches.</strong> Grab a beer and cheer (or heckle) from the side.';
+      h += '<div class="bw-chips">' + r.spectators.map(function (p) { return '<span class="bw-chip">' + esc(p) + '</span>'; }).join("") + '</div></div>';
+    } else {
+      h += '<div class="bw-banner"><strong>Beer duty:</strong> ' + esc(r.waiter) + ' waits this round and fetches the beers for everyone.</div>';
+      h += '<div class="bw-banner">All matches start together. The next round unlocks when every match is finished.</div>';
+    }
+
+    r.matches.forEach(function (m, mi) { h += matchHTML(ri, mi, r); });
+
+    var complete = roundComplete(r);
+    if (r.kind === "final" && complete) {
+      var fm = r.matches[0], fs = matchStatus(fm, "final");
+      var champ = fs.result === "a" ? fm.a : fm.b;
+      var other = fs.result === "a" ? fm.b : fm.a;
+      h += '<div class="bw-banner gold bw-champ"><div>&#127942; Lawn Bowls champion</div><div class="name">' + esc(champ) + '</div><div>Runner-up: ' + esc(other) + '</div></div>';
+    } else if (complete && r.kind === "swiss") {
+      var grp = tieGroup();
+      if (r.n >= SWISS_ROUNDS && grp) {
+        h += '<div class="bw-banner"><strong>Tie for the last finalist spot:</strong> ' + grp.map(esc).join(", ") + ' are level on points, shot difference and shots scored. Roll off with one end (closest to the jack wins) and tap the winner.';
+        h += '<div class="bw-btn-row">' + grp.map(function (p) { return '<button class="bw-btn-secondary" data-act="roll" data-name="' + esc(p) + '">' + esc(p) + ' won the roll-off</button>'; }).join("") + '</div></div>';
+      } else {
+        h += '<div class="bw-banner ready"><strong>All matches finished.</strong> Press the button for ' + (r.n >= SWISS_ROUNDS ? "the final." : "Round " + (r.n + 1) + ".") + '<div class="bw-btn-row"><button class="btn btn-gold" data-act="next">Show ' + (r.n >= SWISS_ROUNDS ? "the final" : "Round " + (r.n + 1)) + '</button></div></div>';
+      }
+    }
+
+    h += '<div class="bw-btn-row">';
+    if (state.rounds.length > 1) h += '<button class="bw-btn-secondary" data-act="reopen">Reopen previous round</button>';
+    h += '</div>';
+    h += '</div>';
+    return h;
+  }
+
+  function standingsHTML() {
+    var S = standings();
+    var h = '<div class="card" style="margin-bottom:18px;"><h3 style="margin-top:0; color:var(--green-dark);">Standings</h3>';
+    h += '<table class="bw-table"><tr><th>#</th><th style="text-align:left">Player</th><th>P</th><th>W</th><th>D</th><th>L</th><th>+/-</th><th>Pts</th></tr>';
+    S.forEach(function (r, i) {
+      h += '<tr' + (i < 2 ? ' class="top"' : '') + '><td>' + (i + 1) + '</td><td class="name">' + esc(r.name) + '</td><td>' + r.p + '</td><td>' + r.w + '</td><td>' + r.d + '</td><td>' + r.l + '</td><td>' + (r.diff > 0 ? "+" : "") + r.diff + '</td><td class="pts">' + r.pts + '</td></tr>';
+    });
+    h += '</table><p class="bw-note">Ranked on points, then shot difference (+/-), then shots scored. The top 2 after Round 4 play the final.</p></div>';
+    return h;
+  }
+
+  function historyHTML() {
+    var past = state.rounds.slice(0, state.rounds.length - 1);
+    if (!past.length) return "";
+    var h = '<div class="card" style="margin-bottom:18px;"><details><summary style="cursor:pointer; font-weight:700; color:var(--green-dark);">Earlier rounds</summary><div style="margin-top:12px;">';
+    past.forEach(function (r) {
+      h += '<div class="bw-hist-round"><h4>' + (r.kind === "final" ? "Final" : "Round " + r.n) + '</h4>';
+      r.matches.forEach(function (m) {
+        var st = matchStatus(m, r.kind);
+        h += '<div class="bw-hist-line">Lane ' + m.lane + ': ' + esc(m.a) + ' ' + st.a + ' - ' + st.b + ' ' + esc(m.b) + '</div>';
+      });
+      if (r.waiter) h += '<div class="bw-hist-line" style="color:var(--muted)">Fetched the beers: ' + esc(r.waiter) + '</div>';
+      h += '</div>';
+    });
+    h += '</div></details></div>';
+    return h;
+  }
+
+  function render() {
+    var el = document.getElementById("bw-app");
+    var h = currentRoundHTML() + standingsHTML() + historyHTML();
+    h += '<div class="bw-btn-row" style="margin-bottom:10px;"><button class="bw-btn-secondary bw-btn-danger" data-act="reset">Reset all scores</button></div>';
+    h += '<p class="bw-note">Scores are saved on this device only. Let one person keep score on one phone.</p>';
+    el.innerHTML = h;
+  }
+
+  /* ---------- actions ---------- */
+  document.getElementById("bw-app").addEventListener("click", function (ev) {
+    var t = ev.target;
+    while (t && t !== this && !(t.getAttribute && t.getAttribute("data-act"))) t = t.parentNode;
+    if (!t || t === this) return;
+    var act = t.getAttribute("data-act");
+    var ri = parseInt(t.getAttribute("data-r"), 10);
+    var mi = parseInt(t.getAttribute("data-m"), 10);
+    var ei = parseInt(t.getAttribute("data-e"), 10);
+
+    if (act === "w") {
+      var m = state.rounds[ri].matches[mi], w = t.getAttribute("data-w"), cur = m.ends[ei];
+      if (cur && cur.w === w) { m.ends[ei] = null; }
+      else m.ends[ei] = { w: w, s: (w === "x" ? 0 : (cur && cur.w !== "x" ? cur.s : 0)) };
+      ensureNext();
+    } else if (act === "s") {
+      var m2 = state.rounds[ri].matches[mi], e2 = m2.ends[ei];
+      if (e2 && (e2.w === "a" || e2.w === "b")) e2.s = parseInt(t.getAttribute("data-s"), 10);
+      ensureNext();
+    } else if (act === "next") {
+      ensureNext();
+    } else if (act === "roll") {
+      var name = t.getAttribute("data-name");
+      state.manual[name] = (state.manual[name] || 0) + 1;
+      ensureNext();
+    } else if (act === "reopen") {
+      if (!confirm("Reopen the previous round? Scores entered in the current round will be removed.")) return;
+      state.rounds.pop();
+    } else if (act === "reset") {
+      if (!confirm("Reset all lawn bowls scores and start again from Round 1?")) return;
+      state = freshState();
+    }
+    save();
+    render();
+  });
+
+  state = load();
+  render();
+})();
+</script>
+</body>
+</html>
