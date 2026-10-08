@@ -5,6 +5,7 @@ const NAV_LINKS = [
   { href: "program.html", label: "2026 Program" },
   { href: "format.html", label: "Playing Format" },
   { href: "calculator.html", label: "Live Scorer" },
+  { href: "bowls.html", label: "Bowls" },
   { href: "results.html", label: "Rankings" },
   { href: "history.html", label: "History" },
   { href: "rules.html", label: "Rules" }
