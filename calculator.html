@@ -65,6 +65,18 @@
   .lc-empty { color:var(--muted); font-size:.9rem; font-style:italic; }
   .lc-note { font-size:.82rem; color:var(--muted); margin-top:10px; }
   .lc-round-heading { margin:0 0 8px; color:var(--green-dark); font-size:1rem; }
+
+  .lc-rolebar {
+    display:flex; justify-content:space-between; align-items:center; gap:10px; flex-wrap:wrap;
+    padding:12px 16px; margin-bottom:18px; border-radius:var(--radius);
+    background:#e4f3e6; border:1px solid #bcd9bf; font-size:.88rem; line-height:1.45;
+  }
+  .lc-rolebar.scorer { background:#fff8e1; border-color:#f2d477; }
+  .lc-rolebar.offline { background:#fff2cc; border-color:#f2d477; }
+  .lc-rolebar button {
+    background:transparent; color:var(--green-dark); border:2px solid var(--green);
+    padding:7px 16px; border-radius:30px; font-weight:700; font-size:.82rem; cursor:pointer; font-family:inherit;
+  }
 </style>
 </head>
 <body>
@@ -85,18 +97,19 @@
     </div>
 
     <div id="panel-final">
-      <div class="card" style="margin-bottom:18px;">
+      <div class="lc-rolebar" id="rolebar-final"></div>
+      <div class="card lc-editonly" style="margin-bottom:18px;">
         <h3 style="margin-top:0;">Players, handicaps &amp; starting rank</h3>
         <div class="lc-setup-grid" id="setup-grid-final"></div>
         <p class="lc-note">Rank 1 is the top qualifier, rank 4 the lowest of the four finalists. Rank 1 plays rank 4 and rank 2 plays rank 3 over the front nine; the two front-nine winners play off for the Cup over the back nine, the two front-nine losers play off for 3rd/4th. Par and stroke index are preloaded from the Kennedy Bay Links scorecard.</p>
       </div>
 
-      <div class="card" style="margin-bottom:18px;">
+      <div class="card lc-editonly" style="margin-bottom:18px;">
         <h3 style="margin-top:0;" id="hole-heading-final">Hole 1</h3>
         <div class="lc-hole-row">
           <div class="lc-hole-field">
             <label>Par / SI</label>
-            <div class="lc-hole-info" id="hole-info-final">&mdash;</div>
+            <div class="lc-hole-info" id="hole-info-final">-</div>
           </div>
           <div class="lc-hole-field" id="score-field-final-0"><label></label><input type="number" id="input-score-final-0" min="1" inputmode="numeric"></div>
           <div class="lc-hole-field" id="score-field-final-1"><label></label><input type="number" id="input-score-final-1" min="1" inputmode="numeric"></div>
@@ -127,18 +140,19 @@
     </div>
 
     <div id="panel-losers" style="display:none;">
-      <div class="card" style="margin-bottom:18px;">
+      <div class="lc-rolebar" id="rolebar-losers"></div>
+      <div class="card lc-editonly" style="margin-bottom:18px;">
         <h3 style="margin-top:0;">Players, handicaps &amp; starting rank</h3>
         <div class="lc-setup-grid" id="setup-grid-losers"></div>
         <p class="lc-note">Rank 1 is the 5th-placed qualifier, rank 4 the 8th (lowest) qualifier in this flight. Rank 1 plays rank 4 and rank 2 plays rank 3 over the front nine; the two front-nine winners play off for 5th place over the back nine, the two front-nine losers play off for 7th place. Par and stroke index are preloaded from the Kennedy Bay Links scorecard.</p>
       </div>
 
-      <div class="card" style="margin-bottom:18px;">
+      <div class="card lc-editonly" style="margin-bottom:18px;">
         <h3 style="margin-top:0;" id="hole-heading-losers">Hole 1</h3>
         <div class="lc-hole-row">
           <div class="lc-hole-field">
             <label>Par / SI</label>
-            <div class="lc-hole-info" id="hole-info-losers">&mdash;</div>
+            <div class="lc-hole-info" id="hole-info-losers">-</div>
           </div>
           <div class="lc-hole-field" id="score-field-losers-0"><label></label><input type="number" id="input-score-losers-0" min="1" inputmode="numeric"></div>
           <div class="lc-hole-field" id="score-field-losers-1"><label></label><input type="number" id="input-score-losers-1" min="1" inputmode="numeric"></div>
@@ -175,6 +189,7 @@
 
 <script src="js/data.js"></script>
 <script src="js/app.js"></script>
+<script src="js/cloud.js"></script>
 <script>
 (function () {
   // Kennedy Bay Links, White tees. Par and stroke index per hole (1-18),
@@ -208,6 +223,154 @@
   function makeBracketEngine(cfg) {
     var state = null;
 
+    /* ---- live sharing: one PIN-protected scorer per flight, everyone else watches ---- */
+    var CLOUD = !!(window.KCCloud && window.KCCloud.enabled());
+    var role = "scorer";          // "scorer" may edit, "viewer" only watches
+    var online = true, sending = false, dirty = false, pollTimer = null;
+    var ROLE_KEY = "kc-role-" + cfg.id;
+
+    function sha256Hex(str) {
+      var enc = new TextEncoder().encode(str);
+      return crypto.subtle.digest("SHA-256", enc).then(function (buf) {
+        return Array.prototype.map.call(new Uint8Array(buf), function (b) { return ("0" + b.toString(16)).slice(-2); }).join("");
+      });
+    }
+
+    function holeCount(s) { return s.frontHoles.length + s.backHoles.length; }
+
+    function normalizeRemote(r) {
+      if (!r || typeof r !== "object") return null;
+      var s = defaultState();
+      if (r.players) {
+        for (var i = 0; i < 4; i++) {
+          var p = r.players[i];
+          if (p) s.players[i] = { name: p.name || ("Player " + (i + 1)), hcp: Number(p.hcp) || 0, rank: Number(p.rank) || (i + 1) };
+        }
+      }
+      ["frontHoles", "backHoles"].forEach(function (k) {
+        var raw = r[k] || [];
+        var arr = Array.isArray(raw) ? raw : Object.keys(raw).map(function (x) { return raw[x]; });
+        s[k] = arr.filter(Boolean).map(function (h) {
+          return { si: Number(h.si), scores: [0, 1, 2, 3].map(function (i) { return Number(h.scores[i]); }) };
+        });
+      });
+      s.updated = Number(r.updated) || 0;
+      return s;
+    }
+
+    function pushRemote() {
+      if (!CLOUD || role !== "scorer") return;
+      dirty = true;
+      if (sending) return;
+      sending = true; dirty = false;
+      window.KCCloud.put("golf/" + cfg.id, JSON.parse(JSON.stringify(state))).then(function () {
+        sending = false; online = true; renderRolebar();
+        if (dirty) pushRemote();
+      }).catch(function () {
+        sending = false; online = false; dirty = true; renderRolebar();
+        setTimeout(function () { if (dirty && role === "scorer") pushRemote(); }, 4000);
+      });
+    }
+
+    function pollRemote() {
+      clearTimeout(pollTimer);
+      if (!CLOUD) return;
+      if (document.hidden || (role === "scorer" && (sending || dirty))) { pollTimer = setTimeout(pollRemote, 4000); return; }
+      window.KCCloud.get("golf/" + cfg.id).then(function (r) {
+        online = true;
+        var rs = normalizeRemote(r);
+        if (rs) {
+          if (role === "viewer") {
+            if (JSON.stringify(rs) !== JSON.stringify(state)) { state = rs; renderViewer(); }
+          } else if (rs.updated > (state.updated || 0)) {
+            state = rs;
+            try { localStorage.setItem(cfg.key, JSON.stringify(state)); } catch (err) {}
+            renderAll();
+          }
+        }
+        renderRolebar();
+      }).catch(function () { online = false; renderRolebar(); })
+        .then(function () { pollTimer = setTimeout(pollRemote, 4000); });
+    }
+
+    function pad2(n) { return (n < 10 ? "0" : "") + n; }
+    function clock(ms) { var d = new Date(ms); return pad2(d.getHours()) + ":" + pad2(d.getMinutes()) + ":" + pad2(d.getSeconds()); }
+
+    function renderRolebar() {
+      var el = document.getElementById("rolebar-" + cfg.id);
+      if (!el) return;
+      if (!CLOUD) { el.style.display = "none"; return; }
+      el.style.display = "";
+      var html;
+      if (role === "scorer") {
+        el.className = "lc-rolebar scorer" + (online ? "" : " offline");
+        html = "<span><strong>You are the scorer for the " + cfg.label + ".</strong> Everyone else sees your scores live. " +
+          (online ? "Synced." : "Offline: saved on this phone, will sync automatically.") + "</span>" +
+          "<button data-lc='logout'>Stop scoring</button>";
+      } else {
+        el.className = "lc-rolebar" + (online ? "" : " offline");
+        html = "<span><strong>Live view.</strong> Updates automatically. " +
+          (state && state.updated ? "Scores last changed " + clock(state.updated) + "." : "Waiting for the scorer to start.") +
+          (online ? "" : " (No signal right now.)") + "</span>" +
+          "<button data-lc='login'>I'm the scorer (PIN)</button>";
+      }
+      el.innerHTML = html;
+    }
+
+    function login() {
+      var pin = prompt("Enter the scorer PIN for the " + cfg.label + ":");
+      if (pin === null) return;
+      sha256Hex("kc2026-" + cfg.id + "-" + String(pin).trim()).then(function (h) {
+        if (h === cfg.pinHash) {
+          try { localStorage.setItem(ROLE_KEY, h); } catch (err) {}
+          setRole("scorer");
+        } else {
+          alert("That PIN is not right.");
+        }
+      });
+    }
+
+    function logout() {
+      try { localStorage.removeItem(ROLE_KEY); } catch (err) {}
+      setRole("viewer");
+    }
+
+    function renderViewer() {
+      renderScoreLabels();
+      renderStandings();
+      renderLog();
+    }
+
+    function setRole(newRole) {
+      role = newRole;
+      var panel = document.getElementById("panel-" + cfg.id);
+      Array.prototype.forEach.call(panel.querySelectorAll(".lc-editonly"), function (node) {
+        node.style.display = role === "scorer" ? "" : "none";
+      });
+      if (role === "viewer") {
+        state = defaultState();
+        renderViewer();
+      } else {
+        state = loadState();
+        renderAll();
+        if (CLOUD) {
+          window.KCCloud.get("golf/" + cfg.id).then(function (r) {
+            var rs = normalizeRemote(r);
+            if (rs && rs.updated > (state.updated || 0)) {
+              state = rs;
+              try { localStorage.setItem(cfg.key, JSON.stringify(state)); } catch (err) {}
+              renderAll();
+            } else if ((state.updated || 0) > (rs ? rs.updated : 0)) {
+              pushRemote();
+            }
+            online = true; renderRolebar();
+          }).catch(function () { online = false; renderRolebar(); });
+        }
+      }
+      renderRolebar();
+      if (CLOUD) pollRemote();
+    }
+
     function defaultState() {
       return {
         players: [
@@ -230,7 +393,9 @@
     }
 
     function saveState() {
+      state.updated = Date.now();
       try { localStorage.setItem(cfg.key, JSON.stringify(state)); } catch (err) {}
+      pushRemote();
     }
 
     function ranksValid() {
@@ -293,9 +458,9 @@
           status = (result.holesA > result.holesB ? nameA : nameB) + " wins";
         } else if (tieBreakByRank) {
           var winnerIdx = (Number(state.players[a].rank) < Number(state.players[b].rank)) ? a : b;
-          status = escapeHtml(state.players[winnerIdx].name) + " wins (tied — higher starting rank)";
+          status = escapeHtml(state.players[winnerIdx].name) + " wins (tied, higher starting rank)";
         } else {
-          status = "Tied after 18 — playoff required (tournament director to decide format &amp; venue)";
+          status = "Tied after 18: playoff required (tournament director to decide format &amp; venue)";
         }
       }
       return "<div class='format-match'>" + nameA + " <span class='vs'>VS</span> " + nameB +
@@ -393,10 +558,10 @@
         var hb = KENNEDY_BAY_HOLES[holeIdxBack];
         info.textContent = "Par " + hb.par + " / SI " + hb.si;
         addBtn.disabled = false; addBtn.style.opacity = "1";
-        status.textContent = state.backHoles.length === 0 ? "Front nine complete — see the back-nine pairings below." : "";
+        status.textContent = state.backHoles.length === 0 ? "Front nine complete. See the back-nine pairings below." : "";
       } else {
         heading.textContent = cfg.doneLabel;
-        info.textContent = "—";
+        info.textContent = "-";
         addBtn.disabled = true; addBtn.style.opacity = ".5";
         status.textContent = "All 18 holes recorded.";
       }
@@ -422,9 +587,9 @@
         var loser1 = winner1 === rA ? rD : rA;
         var loser2 = winner2 === rB ? rC : rB;
 
-        html += "<h4 class='lc-round-heading'>Back nine &mdash; " + cfg.winnersHeading + "</h4>";
+        html += "<h4 class='lc-round-heading'>Back nine: " + cfg.winnersHeading + "</h4>";
         html += "<div class='format-matches' style='margin-bottom:18px;'>" + matchBox(winner1, winner2, state.backHoles, 9, false) + "</div>";
-        html += "<h4 class='lc-round-heading'>Back nine &mdash; " + cfg.losersHeading + "</h4>";
+        html += "<h4 class='lc-round-heading'>Back nine: " + cfg.losersHeading + "</h4>";
         html += "<div class='format-matches'>" + matchBox(loser1, loser2, state.backHoles, 9, false) + "</div>";
       } else {
         html += "<p class='lc-note'>Finish the front nine to reveal the back-nine pairings.</p>";
@@ -498,14 +663,23 @@
       renderLog();
     });
 
-    state = loadState();
-    renderAll();
+    document.getElementById("rolebar-" + cfg.id).addEventListener("click", function (ev) {
+      var a = ev.target && ev.target.getAttribute && ev.target.getAttribute("data-lc");
+      if (a === "login") login();
+      else if (a === "logout") logout();
+    });
+
+    var remembered = null;
+    try { remembered = localStorage.getItem(ROLE_KEY); } catch (err) {}
+    setRole(!CLOUD || remembered === cfg.pinHash ? "scorer" : "viewer");
   }
 
   /* ============================== FINAL (4 players) ============================== */
 
   makeBracketEngine({
     id: "final",
+    label: "Final",
+    pinHash: "a6bf5ebc8541cd1fd120c0f8d9386dd7a2c3d86b3845768263b0558e962c8506",
     key: "kc-live-final4-v1",
     doneLabel: "Final complete",
     winnersHeading: "Final (for the Cup)",
@@ -517,6 +691,8 @@
 
   makeBracketEngine({
     id: "losers",
+    label: "Losers Flight",
+    pinHash: "1be9a08330f0c3c8ea19ca58a1718c313078e0f7f2f24adbf4a5f26e834737a0",
     key: "kc-live-losers4-v1",
     doneLabel: "Losers Flight complete",
     winnersHeading: "5th place playoff",

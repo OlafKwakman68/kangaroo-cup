@@ -27,6 +27,10 @@
   .bw-banner.gold { background:linear-gradient(135deg,#fff 0%,#fdf8e8 100%); border:2px solid var(--gold); }
   .bw-banner.ready { background:var(--green); color:#fff; border-color:var(--green-dark); }
   .bw-banner.ready strong { color:var(--gold); }
+  .bw-sync { font-size:.82rem; padding:9px 14px; margin-bottom:16px; border-radius:30px; display:inline-block; font-weight:700; }
+  .bw-sync.live { background:#e4f3e6; color:#1f6b3a; border:1px solid #bcd9bf; }
+  .bw-sync.off { background:#fff2cc; color:#8a6d00; border:1px solid #f2d477; }
+  .bw-sync.local { background:#eee; color:#555; border:1px solid #ddd; }
 
   .bw-round-head { display:flex; justify-content:space-between; align-items:baseline; flex-wrap:wrap; gap:6px; margin-bottom:12px; }
   .bw-round-head h3 { margin:0; color:var(--green-dark); font-size:1.2rem; }
@@ -66,9 +70,7 @@
 
   .bw-chips { display:flex; flex-wrap:wrap; gap:8px; margin-top:8px; }
   .bw-chip { background:var(--cream); border:1px solid #eee5cf; border-radius:20px; padding:5px 13px; font-size:.82rem; font-weight:600; color:var(--green-dark); }
-  .bw-hist-round { margin-bottom:14px; }
-  .bw-hist-round h4 { margin:0 0 4px; color:var(--green-dark); font-size:.95rem; }
-  .bw-hist-line { font-size:.88rem; padding:2px 0; }
+  .bw-hist-round summary { cursor:pointer; font-weight:700; color:var(--green-dark); padding:6px 0; }
   .bw-champ { text-align:center; padding:22px 16px; }
   .bw-champ .name { font-family:Georgia,serif; font-size:2rem; font-weight:800; color:var(--green-dark); margin:6px 0; }
   .bw-btn-row { display:flex; gap:10px; flex-wrap:wrap; margin-top:12px; }
@@ -95,11 +97,15 @@
         <li>Round 1 is pre-drawn. Rounds 2 to 4 pair players by the standings (1st v 2nd, 3rd v 4th and so on), no rematches. The lowest-ranked player who hasn't waited yet fetches the beers.</li>
         <li>Nobody starts the next round until every match is finished.</li>
         <li>After Round 4 the top 2 play the final on their own (3 ends, one sudden-death end if it's a draw). Everyone else watches.</li>
+        <li><strong>Scores are live:</strong> anyone can enter or correct any score on their own phone, and everyone sees it within a few seconds.</li>
       </ul>
     </div>
   </section>
 
-  <section id="bw-app"></section>
+  <section>
+    <div id="bw-sync"></div>
+    <div id="bw-app"></div>
+  </section>
 
 </main>
 
@@ -107,81 +113,145 @@
 
 <script src="js/data.js"></script>
 <script src="js/app.js"></script>
+<script src="js/cloud.js"></script>
 <script>
 (function () {
   var PLAYERS = ["Huub", "Juriaan", "Alex", "Casper", "Olaf B.", "Mack", "Olaf K.", "Gijs", "Eege"];
+  var IDX = {};
+  PLAYERS.forEach(function (p, i) { IDX[p] = i; });
   var ROUND1 = [["Huub", "Eege"], ["Juriaan", "Gijs"], ["Alex", "Olaf B."], ["Mack", "Olaf K."]];
   var WAITER1 = "Casper";
   var SWISS_ROUNDS = 4;
   var ENDS = 3;
-  var KEY = "kc-bowls-2026-v2";
-  var state;
+  var LS_KEY = "kc-bowls-2026-live-v1";
+  var Cloud = window.KCCloud;
+  var CLOUD = !!(Cloud && Cloud.enabled());
+
+  var remote = { ends: {}, manual: {} };   /* last copy seen on the server */
+  var queue = [];                           /* writes not yet confirmed: {p, v} */
+  var data = { ends: {}, manual: {} };      /* remote + queue (what we show) */
+  var rounds = [];
+  var openRounds = {};
+  var online = true, lastSync = 0, lastWriteDone = 0, lastKey = "";
 
   function esc(s) { return String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;"); }
+  function clone(o) { return JSON.parse(JSON.stringify(o)); }
+  function norm(r) { r = r || {}; return { ends: r.ends || {}, manual: r.manual || {} }; }
 
-  function newMatch(lane, a, b) { return { lane: lane, a: a, b: b, ends: [] }; }
-
-  function freshState() {
-    return {
-      rounds: [{
-        n: 1, kind: "swiss", waiter: WAITER1,
-        matches: ROUND1.map(function (p, i) { return newMatch(i + 1, p[0], p[1]); })
-      }],
-      manual: {}
-    };
-  }
-
-  function load() {
+  /* ---------- storage + queue ---------- */
+  function loadLocal() {
     try {
-      var raw = localStorage.getItem(KEY);
-      if (raw) {
-        var s = JSON.parse(raw);
-        if (s && s.rounds && s.rounds.length) { if (!s.manual) s.manual = {}; return s; }
-      }
+      var s = JSON.parse(localStorage.getItem(LS_KEY));
+      if (s) { remote = norm(s.remote); queue = s.queue || []; }
     } catch (e) {}
-    return freshState();
+  }
+  function saveLocal() {
+    try { localStorage.setItem(LS_KEY, JSON.stringify({ remote: remote, queue: queue })); } catch (e) {}
   }
 
-  function save() { try { localStorage.setItem(KEY, JSON.stringify(state)); } catch (e) {} }
+  function applyOp(d, op) {
+    var parts = op.p.split("/");
+    var cur = d;
+    for (var i = 0; i < parts.length - 1; i++) {
+      var k = parts[i];
+      if (cur[k] === null || cur[k] === undefined || typeof cur[k] !== "object") cur[k] = {};
+      cur = cur[k];
+    }
+    var last = parts[parts.length - 1];
+    if (op.v === null) { if (Array.isArray(cur)) cur[last] = null; else delete cur[last]; }
+    else cur[last] = op.v;
+  }
 
-  /* ---------- scoring ---------- */
+  function rebuild() {
+    data = clone(remote);
+    data.ends = data.ends || {};
+    data.manual = data.manual || {};
+    queue.forEach(function (op) { applyOp(data, op); });
+    rounds = computeRounds();
+  }
+
+  var flushing = false;
+  function flush() {
+    if (!CLOUD || flushing || !queue.length) return;
+    flushing = true;
+    var op = queue[0];
+    Cloud.put("bowls/" + op.p, op.v).then(function () {
+      queue = queue.filter(function (o) { return o !== op; });
+      applyOp(remote, op);
+      lastWriteDone = Date.now();
+      online = true;
+      flushing = false;
+      saveLocal();
+      refresh();
+      flush();
+    }).catch(function () {
+      flushing = false;
+      online = false;
+      renderSync();
+      setTimeout(flush, 4000);
+    });
+  }
+
+  function enqueue(path, value) {
+    queue = queue.filter(function (o) { return o.p !== path; });
+    queue.push({ p: path, v: value });
+    saveLocal();
+    if (!CLOUD) { applyOp(remote, { p: path, v: value }); queue = []; saveLocal(); }
+    refresh();
+    flush();
+  }
+
+  /* ---------- scoring helpers ---------- */
+  function mkey(n, a, b) {
+    var x = IDX[a], y = IDX[b];
+    return "r" + n + "_" + Math.min(x, y) + "_" + Math.max(x, y);
+  }
+
+  function endAt(r, m, i) {
+    var rec = data.ends[mkey(r.n, m.a, m.b)];
+    var e = rec ? rec[i] : null;
+    if (!e) return null;
+    var side = e.w === -1 ? "x" : (e.w === IDX[m.a] ? "a" : (e.w === IDX[m.b] ? "b" : null));
+    if (!side) return null;
+    return { w: side, s: side === "x" ? 0 : (e.s | 0) };
+  }
+
   function endDone(e) { return !!e && (e.w === "x" || ((e.w === "a" || e.w === "b") && e.s >= 1)); }
 
-  function totalsN(m, n) {
+  function totalsN(r, m, n) {
     var a = 0, b = 0;
     for (var i = 0; i < n; i++) {
-      var e = m.ends[i];
+      var e = endAt(r, m, i);
       if (!e) continue;
       if (e.w === "a") a += e.s; else if (e.w === "b") b += e.s;
     }
     return { a: a, b: b };
   }
 
-  function neededEnds(m, kind) {
+  function neededEnds(r, m) {
     var n = ENDS;
-    if (kind !== "final") return n;
+    if (r.kind !== "final") return n;
     while (n < 40) {
-      for (var i = 0; i < n; i++) { if (!endDone(m.ends[i])) return n; }
-      var t = totalsN(m, n);
+      for (var i = 0; i < n; i++) { if (!endDone(endAt(r, m, i))) return n; }
+      var t = totalsN(r, m, n);
       if (t.a !== t.b) return n;
       n++;
     }
     return n;
   }
 
-  function matchStatus(m, kind) {
-    var n = neededEnds(m, kind);
-    var all = true;
-    for (var i = 0; i < n; i++) { if (!endDone(m.ends[i])) { all = false; break; } }
-    var t = totalsN(m, n);
-    var complete = all && (kind !== "final" || t.a !== t.b);
+  function matchStatus(r, m) {
+    var n = neededEnds(r, m), all = true;
+    for (var i = 0; i < n; i++) { if (!endDone(endAt(r, m, i))) { all = false; break; } }
+    var t = totalsN(r, m, n);
+    var complete = all && (r.kind !== "final" || t.a !== t.b);
     var result = null;
     if (complete) result = t.a > t.b ? "a" : (t.b > t.a ? "b" : "draw");
     return { n: n, a: t.a, b: t.b, complete: complete, result: result };
   }
 
   function roundComplete(r) {
-    return r.matches.every(function (m) { return matchStatus(m, r.kind).complete; });
+    return r.matches.every(function (m) { return matchStatus(r, m).complete; });
   }
 
   /* ---------- standings ---------- */
@@ -190,13 +260,13 @@
   }
   function tiedKey(r) { return r.pts + "|" + r.diff + "|" + r.sf + "|" + r.man; }
 
-  function standings() {
+  function standingsFor(rs) {
     var rec = {};
     PLAYERS.forEach(function (p, i) { rec[p] = { name: p, seed: i, p: 0, w: 0, d: 0, l: 0, pts: 0, sf: 0, sa: 0 }; });
-    state.rounds.forEach(function (r) {
+    rs.forEach(function (r) {
       if (r.kind !== "swiss") return;
       r.matches.forEach(function (m) {
-        var st = matchStatus(m, r.kind);
+        var st = matchStatus(r, m);
         if (!st.complete) return;
         var A = rec[m.a], B = rec[m.b];
         A.p++; B.p++;
@@ -206,24 +276,24 @@
         else { A.d++; B.d++; A.pts++; B.pts++; }
       });
     });
-    var list = PLAYERS.map(function (p) {
-      var r = rec[p]; r.diff = r.sf - r.sa; r.man = state.manual[p] || 0; return r;
+    var list = PLAYERS.map(function (p, i) {
+      var r = rec[p]; r.diff = r.sf - r.sa; r.man = (data.manual[i] | 0); return r;
     });
     list.sort(cmp);
     return list;
   }
 
-  function tieGroup() {
-    var S = standings();
+  function tieGroup(rs) {
+    var S = standingsFor(rs);
     if (S.length < 3 || tiedKey(S[1]) !== tiedKey(S[2])) return null;
     var k = tiedKey(S[1]);
     return S.filter(function (r) { return tiedKey(r) === k; }).map(function (r) { return r.name; });
   }
 
-  /* ---------- pairing ---------- */
-  function playedPairs() {
+  /* ---------- rounds are derived from the scores ---------- */
+  function playedPairs(rs) {
     var set = {};
-    state.rounds.forEach(function (r) {
+    rs.forEach(function (r) {
       if (r.kind !== "swiss") return;
       r.matches.forEach(function (m) { set[m.a + "|" + m.b] = 1; set[m.b + "|" + m.a] = 1; });
     });
@@ -243,43 +313,51 @@
     return null;
   }
 
-  function nextSwissRound() {
-    var S = standings();
+  function nextSwissRound(rs) {
+    var S = standingsFor(rs);
     var waited = {};
-    state.rounds.forEach(function (r) { if (r.waiter) waited[r.waiter] = 1; });
+    rs.forEach(function (r) { if (r.waiter) waited[r.waiter] = 1; });
     var waiter = null;
     for (var i = S.length - 1; i >= 0; i--) { if (!waited[S[i].name]) { waiter = S[i].name; break; } }
     var names = S.map(function (r) { return r.name; }).filter(function (n) { return n !== waiter; });
-    var played = playedPairs();
+    var played = playedPairs(rs);
     var pairs = pairUp(names, played, false) || pairUp(names, played, true);
     return {
-      n: state.rounds.length + 1, kind: "swiss", waiter: waiter,
-      matches: pairs.map(function (p, i) { return newMatch(i + 1, p[0], p[1]); })
+      n: rs.length + 1, kind: "swiss", waiter: waiter,
+      matches: pairs.map(function (p, k) { return { lane: k + 1, a: p[0], b: p[1] }; })
     };
   }
 
-  function finalRound() {
-    var S = standings();
+  function finalRound(rs) {
+    var S = standingsFor(rs);
     var a = S[0].name, b = S[1].name;
     return {
-      n: state.rounds.length + 1, kind: "final", waiter: null,
+      n: rs.length + 1, kind: "final", waiter: null,
       spectators: PLAYERS.filter(function (p) { return p !== a && p !== b; }),
-      matches: [newMatch(1, a, b)]
+      matches: [{ lane: 1, a: a, b: b }]
     };
   }
 
-  function ensureNext() {
-    var last = state.rounds[state.rounds.length - 1];
-    if (last.kind === "final" || !roundComplete(last)) return;
-    if (last.n < SWISS_ROUNDS) state.rounds.push(nextSwissRound());
-    else if (!tieGroup()) state.rounds.push(finalRound());
+  function computeRounds() {
+    var rs = [{
+      n: 1, kind: "swiss", waiter: WAITER1,
+      matches: ROUND1.map(function (p, i) { return { lane: i + 1, a: p[0], b: p[1] }; })
+    }];
+    while (true) {
+      var last = rs[rs.length - 1];
+      if (last.kind === "final" || !roundComplete(last)) break;
+      if (last.n < SWISS_ROUNDS) { rs.push(nextSwissRound(rs)); continue; }
+      if (!tieGroup(rs)) rs.push(finalRound(rs));
+      break;
+    }
+    return rs;
   }
 
   /* ---------- rendering ---------- */
-  function endsHTML(ri, mi, m, kind) {
-    var st = matchStatus(m, kind), html = "";
+  function endsHTML(ri, mi, r, m) {
+    var st = matchStatus(r, m), html = "";
     for (var i = 0; i < st.n; i++) {
-      var e = m.ends[i] || null;
+      var e = endAt(r, m, i);
       var label = i < ENDS ? "End " + (i + 1) : "Sudden death";
       var d = ' data-r="' + ri + '" data-m="' + mi + '" data-e="' + i + '"';
       html += '<div class="bw-end"><div class="bw-end-label">' + label + '</div><div class="bw-end-btns">';
@@ -299,26 +377,21 @@
     return html;
   }
 
-  function resultText(m, st) {
-    if (!st.complete) return "";
-    if (st.result === "draw") return "Draw";
-    return (st.result === "a" ? m.a : m.b) + " wins";
-  }
-
   function matchHTML(ri, mi, r) {
-    var m = r.matches[mi], st = matchStatus(m, r.kind);
+    var m = r.matches[mi], st = matchStatus(r, m);
+    var res = !st.complete ? "" : (st.result === "draw" ? "Draw" : (st.result === "a" ? m.a : m.b) + " wins");
     var h = '<div class="bw-match' + (st.complete ? " done" : "") + '">';
     h += '<div class="bw-lane">Lane ' + m.lane + (r.kind === "final" ? " &middot; Final" : "") + '</div>';
     h += '<div class="bw-vs"><div class="bw-player">' + esc(m.a) + '</div><div class="bw-score">' + st.a + ' - ' + st.b + '</div><div class="bw-player right">' + esc(m.b) + '</div></div>';
-    h += '<div class="bw-status' + (st.complete ? " win" : "") + '">' + (st.complete ? resultText(m, st) : "Playing...") + '</div>';
-    h += endsHTML(ri, mi, m, r.kind);
+    h += '<div class="bw-status' + (st.complete ? " win" : "") + '">' + (st.complete ? res : "Playing...") + '</div>';
+    h += endsHTML(ri, mi, r, m);
     h += '</div>';
     return h;
   }
 
   function currentRoundHTML() {
-    var ri = state.rounds.length - 1, r = state.rounds[ri];
-    var done = r.matches.filter(function (m) { return matchStatus(m, r.kind).complete; }).length;
+    var ri = rounds.length - 1, r = rounds[ri];
+    var done = r.matches.filter(function (m) { return matchStatus(r, m).complete; }).length;
     var h = '<div class="card" style="margin-bottom:18px;">';
     h += '<div class="bw-round-head"><h3>' + (r.kind === "final" ? "Final" : "Round " + r.n + " of " + SWISS_ROUNDS) + '</h3>';
     h += '<span class="bw-progress">' + done + ' of ' + r.matches.length + ' match' + (r.matches.length === 1 ? "" : "es") + ' finished</span></div>';
@@ -328,36 +401,30 @@
       h += '<div class="bw-chips">' + r.spectators.map(function (p) { return '<span class="bw-chip">' + esc(p) + '</span>'; }).join("") + '</div></div>';
     } else {
       h += '<div class="bw-banner"><strong>Beer duty:</strong> ' + esc(r.waiter) + ' waits this round and fetches the beers for everyone.</div>';
-      h += '<div class="bw-banner">All matches start together. The next round unlocks when every match is finished.</div>';
+      h += '<div class="bw-banner">All matches start together. The next round appears when every match is finished.</div>';
     }
 
     r.matches.forEach(function (m, mi) { h += matchHTML(ri, mi, r); });
 
     var complete = roundComplete(r);
     if (r.kind === "final" && complete) {
-      var fm = r.matches[0], fs = matchStatus(fm, "final");
+      var fm = r.matches[0], fs = matchStatus(r, fm);
       var champ = fs.result === "a" ? fm.a : fm.b;
       var other = fs.result === "a" ? fm.b : fm.a;
       h += '<div class="bw-banner gold bw-champ"><div>&#127942; Lawn Bowls champion</div><div class="name">' + esc(champ) + '</div><div>Runner-up: ' + esc(other) + '</div></div>';
-    } else if (complete && r.kind === "swiss") {
-      var grp = tieGroup();
-      if (r.n >= SWISS_ROUNDS && grp) {
+    } else if (complete && r.kind === "swiss" && r.n >= SWISS_ROUNDS) {
+      var grp = tieGroup(rounds);
+      if (grp) {
         h += '<div class="bw-banner"><strong>Tie for the last finalist spot:</strong> ' + grp.map(esc).join(", ") + ' are level on points, shot difference and shots scored. Roll off with one end (closest to the jack wins) and tap the winner.';
         h += '<div class="bw-btn-row">' + grp.map(function (p) { return '<button class="bw-btn-secondary" data-act="roll" data-name="' + esc(p) + '">' + esc(p) + ' won the roll-off</button>'; }).join("") + '</div></div>';
-      } else {
-        h += '<div class="bw-banner ready"><strong>All matches finished.</strong> Press the button for ' + (r.n >= SWISS_ROUNDS ? "the final." : "Round " + (r.n + 1) + ".") + '<div class="bw-btn-row"><button class="btn btn-gold" data-act="next">Show ' + (r.n >= SWISS_ROUNDS ? "the final" : "Round " + (r.n + 1)) + '</button></div></div>';
       }
     }
-
-    h += '<div class="bw-btn-row">';
-    if (state.rounds.length > 1) h += '<button class="bw-btn-secondary" data-act="reopen">Reopen previous round</button>';
-    h += '</div>';
     h += '</div>';
     return h;
   }
 
   function standingsHTML() {
-    var S = standings();
+    var S = standingsFor(rounds);
     var h = '<div class="card" style="margin-bottom:18px;"><h3 style="margin-top:0; color:var(--green-dark);">Standings</h3>';
     h += '<table class="bw-table"><tr><th>#</th><th style="text-align:left">Player</th><th>P</th><th>W</th><th>D</th><th>L</th><th>+/-</th><th>Pts</th></tr>';
     S.forEach(function (r, i) {
@@ -368,19 +435,16 @@
   }
 
   function historyHTML() {
-    var past = state.rounds.slice(0, state.rounds.length - 1);
-    if (!past.length) return "";
-    var h = '<div class="card" style="margin-bottom:18px;"><details><summary style="cursor:pointer; font-weight:700; color:var(--green-dark);">Earlier rounds</summary><div style="margin-top:12px;">';
-    past.forEach(function (r) {
-      h += '<div class="bw-hist-round"><h4>' + (r.kind === "final" ? "Final" : "Round " + r.n) + '</h4>';
-      r.matches.forEach(function (m) {
-        var st = matchStatus(m, r.kind);
-        h += '<div class="bw-hist-line">Lane ' + m.lane + ': ' + esc(m.a) + ' ' + st.a + ' - ' + st.b + ' ' + esc(m.b) + '</div>';
-      });
-      if (r.waiter) h += '<div class="bw-hist-line" style="color:var(--muted)">Fetched the beers: ' + esc(r.waiter) + '</div>';
-      h += '</div>';
-    });
-    h += '</div></details></div>';
+    if (rounds.length < 2) return "";
+    var h = '<div class="card" style="margin-bottom:18px;"><h3 style="margin-top:0; color:var(--green-dark);">Earlier rounds</h3>';
+    for (var ri = rounds.length - 2; ri >= 0; ri--) {
+      var r = rounds[ri];
+      h += '<details class="bw-hist-round" data-hr="' + r.n + '"' + (openRounds[r.n] ? " open" : "") + '><summary>' + (r.kind === "final" ? "Final" : "Round " + r.n) + '</summary>';
+      if (r.waiter) h += '<p class="bw-note" style="margin:0 0 10px;">Fetched the beers: ' + esc(r.waiter) + '</p>';
+      r.matches.forEach(function (m, mi) { h += matchHTML(rounds.indexOf(r), mi, r); });
+      h += '<p class="bw-note">Correcting a score here can change the standings and later pairings.</p></details>';
+    }
+    h += '</div>';
     return h;
   }
 
@@ -388,48 +452,94 @@
     var el = document.getElementById("bw-app");
     var h = currentRoundHTML() + standingsHTML() + historyHTML();
     h += '<div class="bw-btn-row" style="margin-bottom:10px;"><button class="bw-btn-secondary bw-btn-danger" data-act="reset">Reset all scores</button></div>';
-    h += '<p class="bw-note">Scores are saved on this device only. Let one person keep score on one phone.</p>';
+    h += '<p class="bw-note">Anyone can enter or correct any score. Changes show up on every phone within a few seconds.</p>';
     el.innerHTML = h;
   }
 
+  function pad(n) { return (n < 10 ? "0" : "") + n; }
+  function renderSync() {
+    var el = document.getElementById("bw-sync");
+    var cls, txt;
+    if (!CLOUD) { cls = "local"; txt = "Local only: scores stay on this phone until the cloud is switched on"; }
+    else if (!online || queue.length) { cls = "off"; txt = "Offline: your scores are saved on this phone and will sync automatically"; }
+    else {
+      var d = new Date(lastSync || Date.now());
+      cls = "live"; txt = "Live: synced " + pad(d.getHours()) + ":" + pad(d.getMinutes()) + ":" + pad(d.getSeconds());
+    }
+    el.innerHTML = '<span class="bw-sync ' + cls + '">' + txt + '</span>';
+  }
+
+  function refresh() {
+    rebuild();
+    var key = JSON.stringify(data);
+    if (key !== lastKey) { lastKey = key; render(); }
+    renderSync();
+  }
+
+  /* ---------- polling ---------- */
+  function poll() {
+    if (!CLOUD) return;
+    if (document.hidden) { setTimeout(poll, 3000); return; }
+    var started = Date.now();
+    Cloud.get("bowls").then(function (r) {
+      if (started >= lastWriteDone) { remote = norm(r); saveLocal(); }
+      online = true; lastSync = Date.now();
+      refresh();
+    }).catch(function () {
+      online = false; renderSync();
+    }).then(function () { setTimeout(poll, 3000); });
+  }
+
   /* ---------- actions ---------- */
+  document.getElementById("bw-app").addEventListener("toggle", function (ev) {
+    var t = ev.target;
+    if (t && t.getAttribute && t.getAttribute("data-hr")) openRounds[t.getAttribute("data-hr")] = t.open;
+  }, true);
+
   document.getElementById("bw-app").addEventListener("click", function (ev) {
     var t = ev.target;
     while (t && t !== this && !(t.getAttribute && t.getAttribute("data-act"))) t = t.parentNode;
     if (!t || t === this) return;
     var act = t.getAttribute("data-act");
-    var ri = parseInt(t.getAttribute("data-r"), 10);
-    var mi = parseInt(t.getAttribute("data-m"), 10);
-    var ei = parseInt(t.getAttribute("data-e"), 10);
 
-    if (act === "w") {
-      var m = state.rounds[ri].matches[mi], w = t.getAttribute("data-w"), cur = m.ends[ei];
-      if (cur && cur.w === w) { m.ends[ei] = null; }
-      else m.ends[ei] = { w: w, s: (w === "x" ? 0 : (cur && cur.w !== "x" ? cur.s : 0)) };
-      ensureNext();
-    } else if (act === "s") {
-      var m2 = state.rounds[ri].matches[mi], e2 = m2.ends[ei];
-      if (e2 && (e2.w === "a" || e2.w === "b")) e2.s = parseInt(t.getAttribute("data-s"), 10);
-      ensureNext();
-    } else if (act === "next") {
-      ensureNext();
+    if (act === "w" || act === "s") {
+      var ri = parseInt(t.getAttribute("data-r"), 10);
+      var mi = parseInt(t.getAttribute("data-m"), 10);
+      var ei = parseInt(t.getAttribute("data-e"), 10);
+      var r = rounds[ri], m = r && r.matches[mi];
+      if (!m) return;
+      var path = "ends/" + mkey(r.n, m.a, m.b) + "/" + ei;
+      var cur = endAt(r, m, ei);
+      if (act === "w") {
+        var w = t.getAttribute("data-w");
+        if (cur && cur.w === w) enqueue(path, null);
+        else {
+          var widx = w === "x" ? -1 : (w === "a" ? IDX[m.a] : IDX[m.b]);
+          enqueue(path, { w: widx, s: (w === "x" ? 0 : (cur && cur.w !== "x" ? cur.s : 0)) });
+        }
+      } else if (cur && (cur.w === "a" || cur.w === "b")) {
+        enqueue(path, { w: cur.w === "a" ? IDX[m.a] : IDX[m.b], s: parseInt(t.getAttribute("data-s"), 10) });
+      }
     } else if (act === "roll") {
-      var name = t.getAttribute("data-name");
-      state.manual[name] = (state.manual[name] || 0) + 1;
-      ensureNext();
-    } else if (act === "reopen") {
-      if (!confirm("Reopen the previous round? Scores entered in the current round will be removed.")) return;
-      state.rounds.pop();
+      var idx = IDX[t.getAttribute("data-name")];
+      enqueue("manual/" + idx, (data.manual[idx] | 0) + 1);
     } else if (act === "reset") {
-      if (!confirm("Reset all lawn bowls scores and start again from Round 1?")) return;
-      state = freshState();
+      var typed = prompt("This deletes ALL lawn bowls scores for everyone. Type RESET to confirm.");
+      if (typed !== "RESET") return;
+      queue = [];
+      remote = norm(null);
+      saveLocal();
+      if (CLOUD) {
+        Cloud.put("bowls", null).then(function () { lastWriteDone = Date.now(); refresh(); })
+          .catch(function () { alert("Could not reach the cloud. Check your connection and try again."); });
+      }
+      refresh();
     }
-    save();
-    render();
   });
 
-  state = load();
-  render();
+  loadLocal();
+  refresh();
+  if (CLOUD) { flush(); poll(); }
 })();
 </script>
 </body>
