@@ -2,7 +2,7 @@
    Paste the database URL below once the Firebase project exists, e.g.
    "https://kangaroo-cup-default-rtdb.asia-southeast1.firebasedatabase.app".
    While it is empty the scorers run in local-only mode on each device. */
-window.KC_DB_URL = "";
+window.KC_DB_URL = "https://kangaroo-cup-default-rtdb.asia-southeast1.firebasedatabase.app";
 window.KC_ROOT = "kc2026";
 
 window.KCCloud = (function () {
