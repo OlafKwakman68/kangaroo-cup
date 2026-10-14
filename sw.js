@@ -2,7 +2,7 @@
    and works offline once visited. Bump CACHE_NAME whenever you change
    the site so visitors get the fresh version. */
 
-const CACHE_NAME = "kangaroo-cup-v8";
+const CACHE_NAME = "kangaroo-cup-v9";
 const APP_SHELL = [
   "index.html",
   "program.html",
@@ -15,6 +15,7 @@ const APP_SHELL = [
   "css/style.css",
   "js/app.js",
   "js/data.js",
+  "js/cloud.js",
   "manifest.json",
   "assets/img/crest-hero.png",
   "assets/img/crest-nav.png",
@@ -42,6 +43,10 @@ self.addEventListener("activate", (event) => {
 
 self.addEventListener("fetch", (event) => {
   if (event.request.method !== "GET") return;
+
+  /* Live score data lives on another origin (the cloud database): never
+     cache it, always go straight to the network. */
+  if (new URL(event.request.url).origin !== self.location.origin) return;
 
   /* HTML pages: always try the network first so edits show up on the very
      next load, no cache-version bump needed. Falls back to the cached copy
