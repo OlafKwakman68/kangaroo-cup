@@ -10,6 +10,23 @@
 <link rel="icon" href="assets/img/favicon-32-v2.png">
 <link rel="apple-touch-icon" href="assets/img/apple-touch-icon-v2.png">
 <link rel="stylesheet" href="css/style.css">
+<style>
+.kc-final{display:grid;gap:18px;grid-template-columns:1fr;margin-bottom:34px}
+.kc-final ol{list-style:none;padding:0;margin:0}
+.kc-final li{display:flex;gap:12px;align-items:center;padding:9px 4px;border-bottom:1px solid rgba(0,0,0,.08)}
+.kc-final li .pos{width:26px;font-weight:800;color:var(--muted,#666)}
+.kc-final li.win{font-weight:800;font-size:1.1rem}
+.kc-final li.win .pos{color:#b8860b}
+.kc-final li.dnf{color:var(--muted,#666);font-style:italic}
+.kc-gallery{display:grid;grid-template-columns:repeat(2,1fr);gap:8px}
+.kc-gallery a{display:block;aspect-ratio:1/1;overflow:hidden;border-radius:10px;background:#ddd}
+.kc-gallery img{width:100%;height:100%;object-fit:cover;display:block}
+@media(min-width:700px){.kc-gallery{grid-template-columns:repeat(4,1fr)}.kc-final{grid-template-columns:1fr 1fr}}
+.kc-next{text-align:center;padding:34px 20px;margin:34px 0;border-radius:16px;background:#1f6b3a;color:#fff}
+.kc-next h2{margin:6px 0 8px;color:#fff}
+.kc-next p{margin:0;opacity:.9}
+.kc-next .kc-soon{display:inline-block;margin-top:14px;padding:6px 16px;border:1px solid rgba(255,255,255,.6);border-radius:999px;font-size:.8rem;letter-spacing:.14em;text-transform:uppercase}
+</style>
 </head>
 <body>
 
@@ -37,6 +54,54 @@
 </section>
 
 <main class="wrap">
+
+  <section>
+    <h2>Kangaroo Cup 2026 is in the books</h2>
+    <div class="kc-final">
+      <div class="card">
+        <span class="tag">Final ranking</span>
+        <h3 style="margin:6px 0 10px;">Champion: Juriaan de Jong</h3>
+        <ol>
+        <li class="win"><span class="pos">1</span><span>Juriaan 🏆</span></li>
+        <li><span class="pos">2</span><span>Gijs</span></li>
+        <li><span class="pos">3</span><span>Olaf K</span></li>
+        <li><span class="pos">4</span><span>Huub</span></li>
+        <li><span class="pos">5</span><span>Olaf B</span></li>
+        <li><span class="pos">6</span><span>Casper</span></li>
+        <li><span class="pos">7</span><span>Mack</span></li>
+        <li><span class="pos">8</span><span>Alex</span></li>
+        <li class="dnf"><span class="pos">-</span><span>Eege (did not finish)</span></li>
+        </ol>
+      </div>
+      <div class="card">
+        <span class="tag">Perth, 15-18 Oct 2026</span>
+        <h3 style="margin:6px 0 10px;">Four days, four courses, one trophy</h3>
+        <p style="margin:0;">Meadow Springs, Collier Park, Araluen and Kennedy Bay Links, plus a Friday night on the lawn bowls. Thanks everyone for another great Cup.</p>
+      </div>
+    </div>
+    <div class="kc-gallery">
+      <a href="assets/gallery2026/2026-01.jpg"><img src="assets/gallery2026/2026-01.jpg" loading="lazy" alt="Kangaroo Cup 2026 photo 1"></a>
+      <a href="assets/gallery2026/2026-02.jpg"><img src="assets/gallery2026/2026-02.jpg" loading="lazy" alt="Kangaroo Cup 2026 photo 2"></a>
+      <a href="assets/gallery2026/2026-03.jpg"><img src="assets/gallery2026/2026-03.jpg" loading="lazy" alt="Kangaroo Cup 2026 photo 3"></a>
+      <a href="assets/gallery2026/2026-04.jpg"><img src="assets/gallery2026/2026-04.jpg" loading="lazy" alt="Kangaroo Cup 2026 photo 4"></a>
+      <a href="assets/gallery2026/2026-05.jpg"><img src="assets/gallery2026/2026-05.jpg" loading="lazy" alt="Kangaroo Cup 2026 photo 5"></a>
+      <a href="assets/gallery2026/2026-06.jpg"><img src="assets/gallery2026/2026-06.jpg" loading="lazy" alt="Kangaroo Cup 2026 photo 6"></a>
+      <a href="assets/gallery2026/2026-07.jpg"><img src="assets/gallery2026/2026-07.jpg" loading="lazy" alt="Kangaroo Cup 2026 photo 7"></a>
+      <a href="assets/gallery2026/2026-08.jpg"><img src="assets/gallery2026/2026-08.jpg" loading="lazy" alt="Kangaroo Cup 2026 photo 8"></a>
+      <a href="assets/gallery2026/2026-09.jpg"><img src="assets/gallery2026/2026-09.jpg" loading="lazy" alt="Kangaroo Cup 2026 photo 9"></a>
+      <a href="assets/gallery2026/2026-10.jpg"><img src="assets/gallery2026/2026-10.jpg" loading="lazy" alt="Kangaroo Cup 2026 photo 10"></a>
+      <a href="assets/gallery2026/2026-11.jpg"><img src="assets/gallery2026/2026-11.jpg" loading="lazy" alt="Kangaroo Cup 2026 photo 11"></a>
+      <a href="assets/gallery2026/2026-12.jpg"><img src="assets/gallery2026/2026-12.jpg" loading="lazy" alt="Kangaroo Cup 2026 photo 12"></a>
+    </div>
+  </section>
+
+  <section class="kc-next">
+    <img src="assets/img/crest-hero.png" alt="" style="height:72px;opacity:.95;">
+    <h2>Kangaroo Cup 2027</h2>
+    <p>The hunt for the trophy goes on.</p>
+    <span class="kc-soon">Coming soon</span>
+  </section>
+
 
   <section class="trophy-hero">
     <div class="trophy-hero-inner">
@@ -75,7 +140,7 @@
       <div class="card info-card">
         <span class="tag">Trophy</span>
         <h3>Reigning champion</h3>
-        <p>Humberto van den Brok</p>
+      <p>Juriaan de Jong</p>
       </div>
     </div>
   </section>
@@ -89,7 +154,7 @@
         <li>Gijs Kampschoer <span class="hcp-badge">HCP 23.5</span></li>
         <li>Jan-Eege Klop <span class="badge-tbd">Winner 2022</span> <span class="hcp-badge">HCP 28.0</span></li>
         <li>Humberto van den Brok <span class="badge-tbd">Winner 2025</span> <span class="hcp-badge">HCP 15.4</span></li>
-        <li>Juriaan de Jong <span class="hcp-badge">HCP 19.1</span></li>
+        <li>Juriaan de Jong <span class="badge-tbd">Winner 2026</span> <span class="hcp-badge">HCP 19.1</span></li>
         <li>Mack Ferguson <span class="hcp-badge">HCP 24.1</span></li>
         <li>Olaf Bluemke <span class="badge-tbd">Winner 2024</span> <span class="hcp-badge">HCP 29.0</span></li>
         <li>Olaf Kwakman <span class="badge-tbd">Winner 2023</span> <span class="hcp-badge">HCP 28.4</span></li>
