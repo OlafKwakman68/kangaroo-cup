@@ -28,9 +28,18 @@ const KANGAROO_CUP = {
       year: 2026,
       dates: "15-18 Oct 2026",
       host: HOST_ADDRESS,
-      champion: "",
-      // Not yet played (15-18 Oct 2026), so ranking is left blank on purpose.
-      rankings: blankRankings(7)
+      champion: "Juriaan de Jong",
+    rankings: [
+      { rank: 1, name: "Juriaan" },
+      { rank: 2, name: "Gijs" },
+      { rank: 3, name: "Olaf K" },
+      { rank: 4, name: "Huub" },
+      { rank: 5, name: "Olaf B" },
+      { rank: 6, name: "Casper" },
+      { rank: 7, name: "Mack" },
+      { rank: 8, name: "Alex" },
+      { rank: null, name: "Eege" }
+    ]
     },
     {
       year: 2025,
