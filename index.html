@@ -37,6 +37,18 @@
 .kc-lb .n{right:10px;top:50%;margin-top:-24px}
 .kc-lb .c{position:absolute;bottom:max(14px,env(safe-area-inset-bottom));left:0;right:0;text-align:center;color:#fff;opacity:.8;font-size:.85rem}
 </style>
+<style>
+.kc-winner{display:grid;grid-template-columns:1fr;gap:0;margin:0 0 22px;border-radius:18px;overflow:hidden;background:linear-gradient(135deg,#1f6b3a,#14472a);color:#fff;box-shadow:0 8px 24px rgba(0,0,0,.18)}
+.kc-winner img{width:100%;display:block;max-height:560px;object-fit:cover;object-position:50% 30%}
+.kc-winner .txt{padding:22px 22px 26px;display:flex;flex-direction:column;justify-content:center}
+.kc-winner .lab{display:inline-block;align-self:flex-start;background:#f2c230;color:#1b3a12;font-weight:800;font-size:.72rem;letter-spacing:.14em;text-transform:uppercase;padding:4px 12px;border-radius:999px}
+.kc-winner h3{margin:12px 0 6px;font-size:2rem;line-height:1.1;color:#fff}
+.kc-winner p{margin:0;opacity:.92}
+@media(min-width:700px){.kc-winner{grid-template-columns:1fr 1fr}.kc-winner img{max-height:none;height:100%}}
+.kc-video{max-width:380px;margin:6px auto 22px;text-align:center}
+.kc-video video{width:100%;border-radius:14px;background:#000;display:block}
+.kc-video p{margin:8px 0 0;font-size:.85rem;color:var(--muted,#666)}
+</style>
 </head>
 <body>
 
@@ -67,6 +79,14 @@
 
   <section>
     <h2>Kangaroo Cup 2026 is in the books</h2>
+    <div class="kc-winner">
+      <img src="assets/gallery2026/winner-2026.jpg" alt="Juriaan de Jong in the green jacket, holding the Kangaroo Cup trophy">
+      <div class="txt">
+        <span class="lab">Champion 2026</span>
+        <h3>Juriaan de Jong</h3>
+        <p>Green jacket on, name on the trophy. Congratulations to this year's Kangaroo Cup winner!</p>
+      </div>
+    </div>
     <div class="kc-final">
       <div class="card">
         <span class="tag">Final ranking</span>
@@ -88,6 +108,12 @@
         <h3 style="margin:6px 0 10px;">Four days, four courses, one trophy</h3>
         <p style="margin:0;">Meadow Springs, Collier Park, Araluen and Kennedy Bay Links, plus a Friday night on the lawn bowls. Thanks everyone for another great Cup.</p>
       </div>
+    </div>
+    <div class="kc-video">
+      <video controls playsinline preload="metadata" poster="assets/video2026/pressure-put.jpg">
+        <source src="assets/video2026/pressure-put.mp4" type="video/mp4">
+      </video>
+      <p>The pressure putt</p>
     </div>
     <div class="kc-gallery">
       <a href="assets/gallery2026/2026-01.jpg"><img src="assets/gallery2026/2026-01.jpg" loading="lazy" alt="Kangaroo Cup 2026 photo 1"></a>
