@@ -2,7 +2,7 @@
    and works offline once visited. Bump CACHE_NAME whenever you change
    the site so visitors get the fresh version. */
 
-const CACHE_NAME = "kangaroo-cup-v13";
+const CACHE_NAME = "kangaroo-cup-v14";
 const APP_SHELL = [
   "index.html",
   "program.html",
